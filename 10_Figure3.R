@@ -27,10 +27,10 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 #### Load Data ----
 
 # load RDS files
-ss_gene <- readRDS("results/Workspace_7_TumorVsNormalAnalysis/tumor_vs_normal_gene_aggregated_summary.rds")
-ss_met <- readRDS("results/Workspace_7_TumorVsNormalAnalysis/tumor_vs_normal_metabolite_aggregated_summary.rds")
+ss_gene <- readRDS("results/Workspace_7_TumorVsNormalAnalysis/tumor_vs_normal_aggregated_summary/tumor_vs_normal_gene_aggregated_summary.rds")
+ss_met <- readRDS("results/Workspace_7_TumorVsNormalAnalysis/tumor_vs_normal_aggregated_summary/tumor_vs_normal_metabolite_aggregated_summary.rds")
 
-load("results/Workspace_7_TumorVsNormalAnalysis/Annotations_Pathways.Rdata")
+load("data_for_scripts/TumorVsNormalAnalysis/Annotations_Pathways.Rdata")
 
 #### Arrange Data ----
 
@@ -183,6 +183,9 @@ allsum2 = allsum[which(allsum$pathway %in% p2use),]
 dfdiff2 = dfdiff[which(dfdiff$pathway %in% p2use),]
 allsum2$pathway = factor(allsum2$pathway,levels = names(pwayscore2)[order(pwayscore2)])
 dfdiff2$pathway = factor(dfdiff2$pathway,levels = names(pwayscore2)[order(pwayscore2)])
+
+allsum2$dataset<-factor(allsum2$dataset,levels=c("BRCA1","COAD","GBM","PDAC","PRAD","ccRCC3","ccRCC4"))
+dfdiff2$dataset<-factor(dfdiff2$dataset,levels=c("BRCA1","COAD","GBM","PDAC","PRAD","ccRCC3","ccRCC4"))
 
 dir.create("results/Figure3",recursive=TRUE)
 
