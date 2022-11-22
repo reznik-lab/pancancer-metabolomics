@@ -24,7 +24,6 @@ writeSE2xls <- function(D, name) {
 
 #### Load normalized data from file ----
 
-# filedir <- results.makepath(sprintf("MetaboPanCan/Data/PreprocessedData2021/%s", Sys.Date()))
 load("results/Workspace_1_PreprocessMetabo.Rdata")
 
 #### Impute missing entries ----

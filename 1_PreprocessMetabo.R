@@ -104,7 +104,7 @@ mapping_file <- read.csv2(file = "data/MasterMapping_MetImmune_03_16_2022.csv", 
 D <- list()
 
 # set data path
-path_data ="data/original/"
+path_data ="data/metabolomics_original/"
 
 # Load Breast Cancer (Terunuma) Data 
 D$BRCA1 <-
@@ -129,21 +129,7 @@ D$COAD <-
   mt_anno_mutate(anno_type = "samples", col_name = "GROUP", term = case_when(Tissue=="Tumour" ~ "TUMOR",
                                                                              Tissue=="Normal" ~ "NORMAL") %>% as.factor)
 
-# # Load DLBCL Data
-# source("/Users/elb4003/Work/PostDocWCM/Projects/Lymphomics/DLBCL/lymphomics_metabolomics_load_SE.R")
-# SE <- loadLymphomicsMetabolomics_SE()
-# rownames(SE) <- rowData(SE)$BIOCHEMICAL
-# # write to file
-# wb = createWorkbook()
-# sheet = addWorksheet(wb, "data")
-# writeData(wb, sheet=sheet, assay(SE) %>% t, colNames = T, rowNames = T)
-# writeData(wb, sheet=sheet, "SAMPLE_NAME", startCol = 1, startRow = 1)
-# sheet = addWorksheet(wb, "metanno")
-# writeData(wb, sheet=sheet, as.data.frame(rowData(SE)) %>% dplyr::select(-name), colNames = T, rowNames = F)
-# sheet = addWorksheet(wb, "sampleanno")
-# writeData(wb, sheet=sheet, as.data.frame(colData(SE)), colNames = T, rowNames = F)
-# saveWorkbook(wb, "data/original/DLBCL.xlsx", overwrite = TRUE)
-
+# Load DLBCL Data
 D$DLBCL <- mt_load_xls(file= paste(path_data,"DLBCL.xlsx",sep=""),sheet = "data", samples_in_rows=T, id_col="SAMPLE_NAME") %>%
   mt_anno_xls(file= paste(path_data,"DLBCL.xlsx",sep=""), sheet="sampleanno", anno_type="samples", anno_id_col="SAMPLE_NAME") %>% 
   mt_anno_xls(file= paste(path_data,"DLBCL.xlsx",sep=""), sheet="metanno", anno_type="features", anno_id_col="BIOCHEMICAL", data_id_col="name") %>%

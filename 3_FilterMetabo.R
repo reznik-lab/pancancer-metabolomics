@@ -9,12 +9,6 @@ library(maplet)
 
 #### Load mapping and annotation files ----
 
-filedir <- results.makepath("MetaboPanCan/Data/")
-
-# # load files with name harmonizations and annotations
-# new_names <- read.xlsx("../../MetabolonMapping/MetinfoFromData.xlsx", sheet = "Sheet2")
-# metanno <- read.xlsx("../../MetabolonMapping/MetinfoFromData.xlsx", sheet = "Sheet3")
-# 
 # load master mapping file
 mapping_file <- read.csv2(file = "data/MasterMapping_MetImmune_03_16_2022.csv", sep=",")
 
@@ -55,7 +49,6 @@ met <- met[sort(names(met))]
 
 # load sample annotations
 anno <- lapply(cohorts %>% {names(.)=.;.}, function(x){
-  print(x)
   read.xlsx(sprintf("data/preprocessed/PreprocessedData_%s.xlsx",x), sheet = "sampleanno", rowNames = T, )
 })
 # add second entry for ccRCC2 (ie. ccRCC3) 
@@ -171,6 +164,6 @@ lapply(names(met_all), function(x){
   
 #### Save Results ----
 
-save(met_all, anno, mapping_file, 
+save(met_all, anno, mapping_file, mm,
      file = "results/Workspace_3_FilterMetabo.Rdata")
  
