@@ -1,16 +1,20 @@
 # pancancer-metabolomics
 
-This repository contains the code to reproduce the findings and figures presented in Benedetti, Liu, Tang, et al., _A Multimodal Atlas of Tumor Metabolism Reveals the Architecture of Gene-Metabolite Co-regulation_, bioRxiv (2022) [url link].
+This repository contains the code to reproduce the findings and figures presented in [Benedetti, Liu, Tang, et al., _A Multimodal Atlas of Tumor Metabolism Reveals the Architecture of Gene-Metabolite Co-regulation_, bioRxiv (2022)]().
 
 ## Data
 
-Before running the code, data must be downloaded from Zenodo (DOI: 10.5281/zenodo.7343440) [url link] and the unzipped folder should be copied into the cloned repository main folder.
-The data structure is as follows:
+Before running the code, data must be downloaded from Zenodo ([DOI: 10.5281/zenodo.7150252](https://zenodo.org/record/7348648#.Y30rsezMKEs)) and the unzipped data/ folder should be copied into the cloned repository main folder. 
+Sourcing the script **_0_DownloadData.R_** will take care of this automatically.
+
+The generated data structure is as follows:
 
 * "_metabolomics_original_" contains the unprocessed metabolomics data
 * "_metabolomics_processed_" contains the preprocessed metabolomics data
-* "_RNA_processed_" contains the preprocessed transcriptomics data
+* "_transcriptomics_processed_" contains the preprocessed transcriptomics data
 * "_TME_deconvolution_processed_" contains the immune deconvolution data
+* "_flow_sorted_ovarian_metabolomics_" contains the ovarian cancer data from Kilgour et al. (2021)
+* "_Metabolism_Immune.aDC_exIDO1_" contains the dendritic cell signature without IDO1
 
 ## Code
 
