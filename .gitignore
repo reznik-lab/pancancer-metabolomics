@@ -3,6 +3,12 @@
 data/.DS_Store
 */*/.DS_Store
 
+# Inpput data
+data
+
+# Results
+results
+
 # History files
 .Rhistory
 .Rapp.history
