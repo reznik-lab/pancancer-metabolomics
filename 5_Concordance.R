@@ -65,14 +65,14 @@ met_joint <- met_scaled[df$dataset[df$tissue=="Tumor"]] %>%
   lapply(function(y){
     y %>% tibble::rownames_to_column("metabolite")
   }) %>%
-  reduce(full_join, by="metabolite") %>%
+  purrr::reduce(full_join, by="metabolite") %>%
   tibble::column_to_rownames("metabolite")
 
 rna_joint <- rna_scaled[df$dataset[df$tissue=="Tumor"]] %>%
   lapply(function(y){
     y %>% tibble::rownames_to_column("gene")
   }) %>%
-  reduce(full_join, by="gene") %>%
+  purrr::reduce(full_join, by="gene") %>%
   tibble::column_to_rownames("gene")
   
 #### Clean up Workspace ----
