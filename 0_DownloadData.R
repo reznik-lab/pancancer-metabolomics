@@ -2,8 +2,15 @@
 
 # set working directory to source file location
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+# clear workspace
+rm(list = ls())
 
 #### Download Molecular Data ----
+
+# since the data files are pretty large
+# we increase the time out length to account for slower connections
+# otherwise the data download might throw an error
+options(timeout=600)
 
 # download preprocessed data from Zotero
 temp <- tempfile()
