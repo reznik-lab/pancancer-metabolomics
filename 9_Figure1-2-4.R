@@ -9,10 +9,8 @@ library(magrittr)
 library(purrr)
 library(ggrepel)
 library(ggpubr)
-library(plotly)
-library(htmlwidgets)
-library(ggpubr)
 library(ggforce)
+library(gtable)
 library(grid)
 library(moonBook)
 library(webr)
@@ -406,7 +404,6 @@ get_tablegrob <- function(tab){
 tab_add_title <- function(tab, text,  face = NULL, size = NULL, color = NULL,
                           family = NULL, padding = unit(1.5,"line"),
                           just = "left", hjust = NULL, vjust = NULL){
-  library("gtable")
   tabgrob <- get_tablegrob(tab)
   text <- grid::textGrob(
     text, x = 0.02, just = just, hjust = hjust, vjust = vjust,
@@ -427,7 +424,6 @@ tab_add_title <- function(tab, text,  face = NULL, size = NULL, color = NULL,
 tab_add_footnote <- function(tab, text,  face = NULL, size = NULL, color = NULL,
                              family = NULL, padding = unit(1.5,"line"),
                              just = "right", hjust = NULL, vjust = NULL){
-  library("gtable")
   tabgrob <- get_tablegrob(tab)
   text <- grid::textGrob(
     text, x = 0.95, just = just, hjust = hjust, vjust = vjust,
@@ -486,6 +482,12 @@ moveme <- function (invec, movecommand) {
 mapping_file <- read.csv2(file = "data/MasterMapping_MetImmune_03_16_2022_release.csv", sep=",") 
 
 # load preprocessed data
+if(!file.exist("results/Workspace_3_FilterMetabo.Rdata")){
+  stop("Cannot find file Workspace_3_FilterMetabo.Rdata in results/. Please run scripts 1-4 first, and then try again. ")
+}
+if(!file.exist("results/Workspace_4_FilterRNA.Rdata")){
+  stop("Cannot find file Workspace_4_FilterRNA.Rdata in results/. Please run scripts 1-4 first, and then try again. ")
+}
 load("results/Workspace_3_FilterMetabo.Rdata")
 load("results/Workspace_4_FilterRNA.Rdata")
 
@@ -766,10 +768,17 @@ dev.off()
 
 #### Figure 2K ----
 
-# Validation data from Priolo et al. (2018) doi: 10.1073/pnas.1710849115
+# Download validation data from Priolo et al. (2018) doi: 10.1073/pnas.1710849115
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6142242/
+
+# load data
+temp <- tempfile()
+download.file(url="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6142242/bin/pnas.1710849115.sd06.xlsx", 
+              destfile = temp)
+ggt1_ko <- read_excel(path=temp, sheet = "scaled data")
+
+# metabolite of interest
 val_met <- c("glutathione disulfide-nega")
-ggt1_ko <- read_excel(path="data_for_scripts/Concordance/pnas.1710849115.sd06.xlsx", sheet = "scaled data")
 
 group <- ggt1_ko[1,2:ncol(ggt1_ko)] %>% t %>% as.data.frame %>%
   tibble::rownames_to_column("ID") %>%
@@ -987,25 +996,6 @@ pdf("results/Figure4C.pdf", width=12, height = 12)
 print(ph)
 dev.off()
 
-#### Table S1 ----
-
-# write to table the significant gene-metabolite pairs
-write.table(x=res_conc %>%
-              dplyr::filter(n_dataset>n_data_cut) %>%
-              dplyr::filter(padj<pcut),
-            file="results/TableS1.txt",
-            append = FALSE, sep = " ", dec = ".",
-            row.names = TRUE, col.names = TRUE)
-
-#### Table S3 ----
-
-# save pathway annotations to file
-res_met %>%
-  dplyr::select(Class,Group,ID,Name) %>% 
-  distinct %>% 
-  write.xlsx2(file="results/TableS3.xlsx", sheetName = "KEGGpathways", 
-              col.names = TRUE, row.names = F, append = FALSE)
-
 #### Figure S1 ----
 
 # concordance distribution
@@ -1095,3 +1085,22 @@ p_met <- lapply(mapping_color$NewName %>% {names(.)=.;.}, function(x){
 pdf("results/FigureS4.pdf", width=7, height=3.5, onefile = F)
 print(ggarrange(p_rna,p_met, ncol=2, nrow=1))
 dev.off()
+
+#### Table S1 ----
+
+# write to table the significant gene-metabolite pairs
+write.table(x=res_conc %>%
+              dplyr::filter(n_dataset>n_data_cut) %>%
+              dplyr::filter(padj<pcut),
+            file="results/TableS1.txt",
+            append = FALSE, sep = " ", dec = ".",
+            row.names = TRUE, col.names = TRUE)
+
+#### Table S4 ----
+
+# save pathway annotations to file
+res_met %>%
+  dplyr::select(Class,Group,ID,Name) %>% 
+  distinct %>% 
+  write.xlsx2(file="results/TableS4.xlsx", sheetName = "KEGGpathways", 
+              col.names = TRUE, row.names = F, append = FALSE)

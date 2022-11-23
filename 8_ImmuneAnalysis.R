@@ -1,4 +1,9 @@
-#Load necessary libraries
+#### Initialize ---
+
+# set working directory to source file location
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+# load libraries
 library(readxl)
 library(data.table)
 library(dplyr)
@@ -13,10 +18,8 @@ library(ggrepel)
 library(reshape2)
 library(patchwork)
 
-#### Set working directory to source file location ----
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-
 #### Load and clean data ----
+
 #Load master mapping spreadsheet
 master_mapping <- read.csv("data/MasterMapping_MetImmune_03_16_2022_release.csv")
 
@@ -34,29 +37,29 @@ normal_names <- gsub(".xlsx","",normal_names) #remove the .xlsx extension
 normal_names <- paste(normal_names,"Normal",sep="_") #add tumor to end so we know what type of sample it is
 names(met_data_normal) <- normal_names[c(1,5,6,7,9,11,14,15)]
 
+# concatenate tumor and normal
 met_data <- c(met_data_tumor,met_data_normal)
-met_data <- met_data[order(names(met_data))] #order alphabetically
+# order alphabetically
+met_data <- met_data[order(names(met_data))]
 
-
-#Make the first column the rownames
+# Make the first column the rownames
 for (i in 1:23) {
   rownames(met_data[[i]]) <- met_data[[i]][,1] #set the first column (metabolites) as the rownames
   met_data[[i]] <- met_data[[i]][,-1] #remove the first column
 }
 
-#Check there are 988 samples
+# Check there are 988 samples
 sum(sapply(1:23,function(i){ncol(met_data[[i]])}))
 
-#Load metabolite information
+# Load metabolite information
 metabolite_mapping = as.data.frame(read_excel('data/MetinfoFromData.xlsx', sheet = 2))
 
-
-#Load TME data
+# Load TME data
 tme_fs = list.files(path='data/TME_deconvolution_processed', full.names = TRUE)
 tme_data = lapply(tme_fs, function(x) read.csv(file=x,row.names = 1, check.names = FALSE))
 names(tme_data) <- list.files(path='data/TME_deconvolution_processed/')
 
-#Harmonize TME data with metabolomics data
+# Harmonize TME data with metabolomics data
 tme_data$BRCA2_Tumor <- tme_data$MergedDeconvolution.PMC4187326_BRCA.csv[master_mapping$ITHID[match(colnames(met_data$BRCA2_Tumor),master_mapping$MetabID)],]
 tme_data$BRCA1_Normal <- tme_data$GSE37751.ssGSEA.UnNorm.Deconvolution.csv[master_mapping$ITHID[match(colnames(met_data$BRCA1_Normal),master_mapping$MetabID)],]
 tme_data$BRCA1_Tumor <- tme_data$GSE37751.ssGSEA.UnNorm.Deconvolution.csv[master_mapping$ITHID[match(colnames(met_data$BRCA1_Tumor),master_mapping$MetabID)],]
@@ -81,31 +84,30 @@ tme_data$ccRCC3_Tumor <- tme_data$Multiregions.2Batchs.ImmuneDeconvolution.csv[m
 tme_data$ccRCC4_Normal <- tme_data$Multiregions.2Batchs.ImmuneDeconvolution.csv[master_mapping$ITHID[match(colnames(met_data$ccRCC4_Normal),master_mapping$MetabID)],]
 tme_data$ccRCC4_Tumor <- tme_data$Multiregions.2Batchs.ImmuneDeconvolution.csv[master_mapping$ITHID[match(colnames(met_data$ccRCC4_Tumor),master_mapping$MetabID)],]
 
-tme_data <- tme_data[-c(1:13)] #remove old TME datasets that aren't cleaned
-
+# remove unnecessary data
+tme_data <- tme_data[-c(1:13)] 
+# order alphabetically
 tme_data <- tme_data[order(names(tme_data))]
 
-#Check samples in metabolite and TME data are in same order 
+# verify that samples in metabolite and TME data are in same order 
 sapply(1:23, function(i){all(master_mapping$CommonID[match(rownames(tme_data[[i]]),master_mapping$ITHID)]==
-                               master_mapping$CommonID[match(colnames(met_data[[i]]),master_mapping$MetabID)])})
+                               master_mapping$CommonID[match(colnames(met_data[[i]]),master_mapping$MetabID)])}) %>% all
 
-#Check there are 988 samples
+# Check there are 988 samples
 sum(sapply(1:23,function(i){nrow(tme_data[[i]])}))
 
-
-#Load list of signatures required
+# set list of signatures required
 bindea_sigs <- c("Th17 cells","NK cells","Tcm cells","T helper cells","Eosinophils","pDC","Tem cells","NK CD56dim cells",
                  "Neutrophils","Macrophages","DC","iDC","NK CD56bright cells","Tfh cells","Treg cells","aDC","Th1 cells",
                  "CD8 T cells","Cytotoxic cells","T cells","B cells","Mast cells","Th2 cells")
 imp_signatures <- c("ImmuneScore",bindea_sigs)
 
-#Clean TME data so we're only including signatures that we use in our analyses
+# Clean TME data so we're only including signatures that we use in our analyses
 for (i in 1:23) {
   tme_data[[i]] <- tme_data[[i]][,imp_signatures] 
 }
 
-
-#Load RNA data (only need datasets that measured histamine, GBM and OV don't have histamine measured)
+# Load RNA data (only need datasets that measured histamine, GBM and OV don't have histamine measured)
 rna_fs = list.files(path='data/transcriptomics_processed', full.names = TRUE)
 rna_data = lapply(rna_fs, function(x) read.csv(file=x,row.names = 1, check.names = FALSE))
 names(rna_data) <- list.files(path='data/transcriptomics_processed/')
@@ -128,11 +130,12 @@ rna_data$ccRCC2_Tumor <- rna_data$Flow4Batch.tpm.gene_symbol.csv[,master_mapping
 rna_data$ccRCC3_Tumor <- rna_data$MultiRegionalRCC.tpm.gene_symbol.csv[,master_mapping$RNAID[match(colnames(met_data$ccRCC3_Tumor),master_mapping$MetabID)]]
 rna_data$ccRCC4_Tumor <- rna_data$Multiregions.2Batchs.Sample.hg19KnownGene.tpm.gene_symbol.csv[,master_mapping$RNAID[match(colnames(met_data$ccRCC4_Tumor),master_mapping$MetabID)]]
 
+# remove unnecessary data
 rna_data <- rna_data[-c(1:23)]
-
+# order alphabetically
 rna_data <- rna_data[order(names(rna_data))]
 
-#Load aDC signature without IDO1
+# Load aDC signature without IDO1
 adc_fs = list.files(path='data/Metabolism_Immune.aDC_exIDO1', full.names = TRUE)
 adc_data = lapply(adc_fs, function(x) read.csv(file=x,row.names = 1, check.names = FALSE))
 names(adc_data) <- list.files(path='data/Metabolism_Immune.aDC_exIDO1')
@@ -142,8 +145,8 @@ adc_data <- adc_data[-6]
 
 adc_data_sub <- adc_data
 
+# select samples that have RNA, TME and metabolomics data
 for(i in 1:13){
-  #include samples that have RNA, TME and metabolomics data
   adc_data_sub[[i]] <- adc_data_sub[[i]][sapply(1:13, function(ii){which(rownames(adc_data_sub[[ii]]) %in% master_mapping$ITHID)})[[i]],] 
 }
 
@@ -154,8 +157,6 @@ for(i in 1:13){
 for(i in 1:13){
   rownames(adc_data_sub[[i]]) <-  sapply(1:13,function(ii){rownames(adc_data[[ii]])[which(rownames(adc_data[[ii]]) %in% master_mapping$ITHID)]})[[i]]
 }
-
-
 
 adc_data_sub$BRCA2_Tumor <- adc_data_sub$PMC4187326_BRCA.aDC_exIDO1.csv[master_mapping$ITHID[match(colnames(met_data$BRCA2_Tumor),master_mapping$MetabID)],]
 adc_data_sub$BRCA1_Tumor <- adc_data_sub$GSE37751.aDC_exIDO1.csv[master_mapping$ITHID[match(colnames(met_data$BRCA1_Tumor),master_mapping$MetabID)],]
@@ -173,21 +174,22 @@ adc_data_sub$ccRCC2_Tumor <- adc_data_sub$Flow4Batch.aDC_exIDO1.csv[master_mappi
 adc_data_sub$ccRCC3_Tumor <- adc_data_sub$MultiRegionalRCC.aDC_exIDO1.csv[master_mapping$ITHID[match(colnames(met_data$ccRCC3_Tumor),master_mapping$MetabID)],]
 adc_data_sub$ccRCC4_Tumor <- adc_data_sub$MultiRegionalRCC.aDC_exIDO1.csv[master_mapping$ITHID[match(colnames(met_data$ccRCC4_Tumor),master_mapping$MetabID)],]
 
-
+# remove unnecessary datasets
 adc_data_sub <- adc_data_sub[-c(1:13)]
+# order alphabetically
 adc_data_sub <- adc_data_sub[order(names(adc_data_sub))]
 
 for(i in 1:15){
   adc_data_sub[[i]] <- scale(adc_data_sub[[i]])
 }
 
-#Load flow-sorted ovarian data from Kilgour et al. 2021
+# Load flow-sorted ovarian data from Kilgour et al. 2021
 kilgour_data_raw <- read.csv("data/flow_sorted_ovarian_metabolomics/Kilgour_2021_Raw_Data.csv")
 rownames(kilgour_data_raw) <- kilgour_data_raw[,1]
 kilgour_data_raw <- kilgour_data_raw[,-1]
 
-#Clean flow-sorted ovarian data
-#Probabilistic Quotient Normalization of the raw data
+# Clean flow-sorted ovarian data
+# Probabilistic Quotient Normalization of the raw data
 normalizationPQN<-function(dat,group="all",refGroupName){
   # row: metabolite
   # column: sample
@@ -248,12 +250,10 @@ for(i in 1:23){
   colnames(tme_zscored_t[[i]]) <- rownames(tme_data[[i]]) #add column names back
 }
 
-
 #Extract tumor samples
 tumors <- which(str_detect(names(tme_data),"Tumor")) #which datasets are tumor datasets
 met_data_tumors <- met_data[tumors] #running analysis only on tumor samples
 tme_zscored_t_tumors <- tme_zscored_t[tumors] #running analysis only on tumor samples
-
 
 #Build matricies for concordance analysis
 joint_metabolite_df_t <- lapply(met_data_tumors, function(y){
@@ -262,22 +262,19 @@ joint_metabolite_df_t <- lapply(met_data_tumors, function(y){
   reduce(full_join, by="metabolite") %>%
   tibble::column_to_rownames("metabolite")
 
-
 joint_imm_sig_df_t <- lapply(tme_zscored_t_tumors, function(y){
   y %>% tibble::rownames_to_column("imm_sig")
 }) %>%
   reduce(full_join, by="imm_sig") %>%
   tibble::column_to_rownames("imm_sig")
 
-
-#Sample size of all cohorts
+# Sample size of all cohorts
 ns_t <- sapply(1:15,function(i){ncol(met_data_tumors[[i]])})
 nsum_t <- cumsum(ns_t)
 #Vector with dataset id for each sample in the joint dataframe
 dataset_id_t <- lapply(seq(ns_t), function(i) rep(i, ns_t[i])) %>% unlist
 #Weight vector for each sample in the joint dataframe
 weights_t <- lapply(seq(ns_t), function(i) rep(1/ns_t[i], ns_t[i])) %>% unlist
-
 
 #Concordance meta-analysis (all datasets)
 ns_t <- sapply(1:15,function(i){ncol(met_data_tumors[[i]])})
@@ -709,8 +706,9 @@ histamine_concordance <- melt(histamine_concordance)
 histamine_concordance$pair <- c("Histamine-Mast Cells")
 
 
+#### Save data to file ----
 
-save.image("immune_deconvolution_results.Rdata")
+save.image("Workspace_8_ImmuneAnalysis.Rdata")
 
 
 

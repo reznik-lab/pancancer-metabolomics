@@ -1,5 +1,8 @@
 #### Initialize ----
 
+# set working directory to source file location
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
 library(tidyverse)
 library(dplyr)
 library(magrittr)
@@ -8,12 +11,9 @@ library(ggplot2)
 library(ggrepel)
 library(writexl)
 
-# set working directory to source file location
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-
 #### Global parameters ----
 
-  mapping_color <- data.frame(OldName= c("BRCA_Terunuma","BRCA_Tang","COAD","CPTAC_GBM","DLBCL",
+mapping_color <- data.frame(OldName= c("BRCA_Terunuma","BRCA_Tang","COAD","CPTAC_GBM","DLBCL",
                                        "HCC","LiCa1","LiCa2","OV","PDAC",
                                        "PRAD","RC12","RC18","RC18_2","RC20"),
                             NewName = c("BRCA1","BRCA2","COAD","GBM","DLBCL",
@@ -64,12 +64,6 @@ pw_remove <- dt_new %>%
 # remove those pathways
 dt_new %<>%
   dplyr::filter(!(pathway %in% pw_remove))
-
-# save pathway annotations to file
-dt_new %>%
-  dplyr::arrange(pathway) %>% 
-  write.xlsx2(file=file.path("results/Workspace_7_TumorVsNormalAnalysis","Table_S2.xlsx"), sheetName = "Tumor_vs_Normal", 
-              col.names = TRUE, row.names = F, append = FALSE)
 
 # create score per dataset
 dt_new %<>%
@@ -165,14 +159,11 @@ allsum %<>%
   dplyr::arrange(score) %>%
   dplyr::mutate(pathway=factor(pathway, levels=pathway %>% unique))
 
-#####
 # re-order pathway in the heatmap
-
 pwayscore2 = c()
 for (ii in unique(metsum$pathway)){
   pwayscore2[ii] = sum(dfdiff[which(dfdiff$pathway == ii),'sign'],na.rm = TRUE)
 }
-
 p2use = unique(allsum$pathway)
 
 # check that dfdiff and allsum have same pathway scores
@@ -187,10 +178,9 @@ dfdiff2$pathway = factor(dfdiff2$pathway,levels = names(pwayscore2)[order(pwaysc
 allsum2$dataset<-factor(allsum2$dataset,levels=c("BRCA1","COAD","GBM","PDAC","PRAD","ccRCC3","ccRCC4"))
 dfdiff2$dataset<-factor(dfdiff2$dataset,levels=c("BRCA1","COAD","GBM","PDAC","PRAD","ccRCC3","ccRCC4"))
 
-dir.create("results/Figure3",recursive=TRUE)
+#### Figure 3A ----
 
-#### Paper Figures ----
-pdf(file.path("results/Figure3","Figure3A.pdf"),height = 7.75,width = 8.5)
+pdf("results/Figure3A.pdf" ,height = 7.75,width = 8.5)
 print(
   ggplot(allsum2,aes(x=omics, y=pathway,color = DF)) + 
     geom_point(aes(size=log10(numOfItemsMeasured))) + 
@@ -220,21 +210,9 @@ print(
 ) 
 dev.off()
 
-####
-TvsN_PathwaySpearman<-dt_new_cor %>%  
-  dplyr::select(pathway,cor,ci_lower,ci_upper,p.value,padj) %>%
-  distinct() %>%
-  dplyr::left_join(kegg_hierarchy, by=c("pathway"="Name")) %>%
-  dplyr::mutate(sign=ifelse(ci_lower>0 | ci_upper<0,"significant","non significant")) %>%
-  dplyr::arrange(-cor) %>%
-  dplyr::mutate(label=ifelse(sign=="significant", pathway, NA)) %>% 
-  mutate_at(vars(pathway), funs(factor(.,levels=unique(.))))
+##### Figure 3B ----
 
-write_xlsx(TvsN_PathwaySpearman,path=file.path("results/Workspace_7_TumorVsNormalAnalysis","Table_S3.xlsx"))
-
-#####  
-
-pdf(file.path("results/Figure3","Figure3B.pdf"), width=5, height=3, onefile = F)
+pdf("results/Figure3B.pdf", width=5, height=3, onefile = F)
 print(
   dt_new_cor %>%  
     dplyr::select(pathway,cor,ci_lower,ci_upper,p.value,padj) %>%
@@ -270,7 +248,32 @@ print(
 )
 dev.off()
 
-#####
+##### Figure 3C ----
+
+# plot scores for selected pathways
+pw <- "Citrate cycle (TCA cycle)"
+
+pdf("results/Figure3C.pdf", width=2.5, height=2.5, onefile = F)
+print(
+  dt_new_cor %>%
+    dplyr::filter(pathway == pw) %>%
+    ggplot(aes(x=metabolite, y=gene, label=dataset)) +
+    geom_point(aes(color=dataset),alpha=0.5) +
+    geom_smooth(aes(color=ifelse(padj<0.05,"significant","non significant")),method=MASS::rlm, se=F, size=0.2) +
+    scale_color_manual(values=setNames(mapping_color$Color, nm=mapping_color$NewName)) +
+    geom_text_repel(size=2) +
+    theme_bw() +
+    xlab("Metabolomics DF score") +
+    ylab("Transcriptomics DF score") +
+    ggtitle(pw) +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black"),
+          text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),
+          legend.position="none",
+          axis.text.y = element_text(color = "black"),
+          axis.text.x = element_text(color="black"))
+)
+dev.off()
 
 #### Fisher's exact test Enrichment ----
 
@@ -293,29 +296,24 @@ dt_pw_enr %>%
   dplyr::select(is_sign,is_carb) %>% 
   table() %>% fisher.test %>% .$p.value
 
-#####
+#### Table S2 ---
 
-# plot scores for selected pathways
-pw <- "Citrate cycle (TCA cycle)"
+# save pathway annotations to file
+dt_new %>%
+  dplyr::arrange(pathway) %>% 
+  write.xlsx2(file=file.path("results/TableS2.xlsx"), sheetName = "Tumor_vs_Normal", 
+              col.names = TRUE, row.names = F, append = FALSE)
 
-pdf(file.path("results/Figure3","Figure3C.pdf"), width=2.5, height=2.5, onefile = F)
-print(
-  dt_new_cor %>%
-    dplyr::filter(pathway == pw) %>%
-    ggplot(aes(x=metabolite, y=gene, label=dataset)) +
-    geom_point(aes(color=dataset),alpha=0.5) +
-    geom_smooth(aes(color=ifelse(padj<0.05,"significant","non significant")),method=MASS::rlm, se=F, size=0.2) +
-    scale_color_manual(values=setNames(mapping_color$Color, nm=mapping_color$OldName)) +
-    geom_text_repel(size=2) +
-    theme_bw() +
-    xlab("Metabolomics DF score") +
-    ylab("Transcriptomics DF score") +
-    ggtitle(pw) +
-    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-          panel.background = element_blank(), axis.line = element_line(colour = "black"),
-          text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),
-          legend.position="none",
-          axis.text.y = element_text(color = "black"),
-          axis.text.x = element_text(color="black"))
-)
-dev.off()
+#### Table S3 ----
+
+TvsN_PathwaySpearman<-dt_new_cor %>%  
+  dplyr::select(pathway,cor,ci_lower,ci_upper,p.value,padj) %>%
+  distinct() %>%
+  dplyr::left_join(kegg_hierarchy, by=c("pathway"="Name")) %>%
+  dplyr::mutate(sign=ifelse(ci_lower>0 | ci_upper<0,"significant","non significant")) %>%
+  dplyr::arrange(-cor) %>%
+  dplyr::mutate(label=ifelse(sign=="significant", pathway, NA)) %>% 
+  mutate_at(vars(pathway), funs(factor(.,levels=unique(.))))
+
+write_xlsx(TvsN_PathwaySpearman,
+           path="results/TableS3.xlsx")

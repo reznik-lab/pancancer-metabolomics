@@ -1,12 +1,25 @@
+#### Initialize ----
+
+# set working directory to source file location
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
 #Load libraries
 library(ggplot2)
 library(ggrepel)
 library(patchwork)
+library(ggpubr)
 
-#Load Rdata file to create figures
-load("immune_deconvolution_results.Rdata")
+#### Load Data ----
+
+# load immune deconvolution analysis results
+if(file.exists("results/Workspace_8_ImmuneAnalysis.Rdata")){
+  load("results/Workspace_8_ImmuneAnalysis.Rdata")
+} else {
+  load("data_for_scripts/ImmuneDeconvolution/ImmuneAnalysis.Rdata")
+}
 
 #### Figure 5 ----
+
 #Panel a; left barplot
 fig5a1 <- ggplot(immunescore_percentage_sig, aes(x = cancer, y = percent, fill = n_samples)) + geom_bar(stat="identity") + 
   ylab("Percentage of Significant Metabolites") + xlab("") +
@@ -61,7 +74,7 @@ fig5a3 <- ggplot(immunescore_concordance_values, aes(x=concordance,y=dataset)) +
 
 #Put panel a together using patchwork
 fig5a <- (fig5a1|fig5a2|fig5a3) + plot_layout(widths = c(1, 0.45, 2.5))
-ggsave("Figure 5A ImmuneScore Concordance by Cancer Type.pdf", fig5a, height = 4, width = 6)
+ggsave("results/Figure5A.pdf", fig5a, height = 4, width = 6)
 
 
 #Panel b
@@ -81,13 +94,13 @@ ICCis_mat <- ggplot(ICC_matrix_melt,aes(x=variable,y=metabolite,fill=as.numeric(
 
 #Put together panel using patchwork
 fig5b <- (HCC_hm|ICC_is_hm)/(HCCis_mat|ICCis_mat)
-ggsave("Figure 5b ICC HCC ImmuneScore Concordance", fig5b, height = 4, width = 4)
+ggsave("results/Figure5B.pdf", fig5b, height = 4, width = 6)
 
 
 #Panel c
 fig5c <- ggplot(immunescore_concordance[1:23,], aes(x = -log10(p.adj), y = metabolite)) + geom_bar(stat="identity") + theme_classic() +
   xlab("-Log10 FDR-Corrected P-Value") + ylab("") + ggtitle("ImmuneScore Concordance")
-ggsave("Figure 5c ImmuneScore Concordance by Metabolite.pdf", fig5c, height = 3.5, width = 3.5)
+ggsave("results/Figure5C.pdf", fig5c, height = 3.5, width = 6)
 
 
 #Panel d
@@ -99,16 +112,16 @@ fig5d2 <- ggplot(nmn_is_exp, aes(x=NMN, y=ImmuneScore, color = CancerType)) + ge
   theme_classic() + geom_point(size=0.25) + theme(legend.position = "bottom") +
   scale_color_manual(values=mapping_color$Color[match(levels(nmn_is_exp$CancerType),mapping_color$Name)])
 
-#Put together panel using patchwork
-fig5d <- fig5d1/fig5d2
-ggsave("Figure 5d ImmuneScore vs Quinolinate and NMN Concordance Scatterplots Across Datasets.pdf", fig5d, width = 2.25, height = 4.5, units = "in")
+#Put together panel using ggpubr
+fig5d <- ggarrange(fig5d1,fig5d2, nrow=2, ncol=1, common.legend = T)
+ggsave("results/Figure5D.pdf", fig5d, width = 4, height = 8, units = "in")
 
 
 #Panel e
 fig5e <- ggplot(is_pathway_analysis, aes(x=-log10(p.adj), y=pathway)) + 
   geom_bar(stat="identity") + theme_classic() + ylab("") + xlab("-log10(Adjusted P-Value)") + 
   ggtitle("ImmuneScore")  + geom_vline(xintercept = -log10(0.05), color = "red", linetype ="dashed")
-ggsave("Figure 5e ImmuneScore Pathway Analysis Barplot.pdf", fig5e, width = 3, height = 3.65, units = "in")
+ggsave("results/Figure5E.pdf", fig5e, width = 5, height = 3.65, units = "in")
 
 
 #Panel f
@@ -121,8 +134,7 @@ fig5f2 <- ggplot(ov_nad, aes(x=NAD,y=ImmuneScore)) + geom_point(size=0.5) + geom
   xlab("NAD+")
 
 fig5f <- fig5f1/fig5f2
-ggsave("Figure 5f Flow sorted and cAMP NAD vs Immune Infiltration Plots.pdf", fig5f, width = 2.55, height = 3.85, units = "in")
-
+ggsave("results/Figure5F.pdf", fig5f, width = 2.55, height = 3.85, units = "in")
 
 
 #### Figure 6 ----
@@ -131,49 +143,46 @@ ggsave("Figure 5f Flow sorted and cAMP NAD vs Immune Infiltration Plots.pdf", fi
 fig6a1 <- ggplot(bindea_concordance, aes(x=concordance,y=-log10(p.adj))) + geom_point(aes(color = color), size = 1) + 
   scale_color_manual(values= c("#D9D9D9","#FBB4AE")) + theme_classic() +
   geom_text_repel(data = subset(bindea_concordance,pair %in% label_pairs_bindea), aes(label = pair, size = 4)) + 
-  geom_hline(yintercept = -log10(0.05)) + xlim(-0.35,0.35)
-ggsave("Figure 6a1 Concordance Volcano Plot n > 7 and Bindea Signatures Only.pdf", fig6a1, width = 2.5, height = 2.75, units = "in")
-
+  geom_hline(yintercept = -log10(0.05)) + xlim(-0.35,0.35) + theme(legend.position="none")
 fig6a2 <- ggplot(bindea_concordance,aes(x=concordance,y=col2)) + geom_point(shape=124,size=3,color=bindea_concordance$col3) + 
   theme_classic() + ylab("") + xlab("") + theme(axis.ticks = element_blank(),axis.text = element_blank()) + xlim(-0.35,0.35)
-ggsave("Figure 6a2 Concordance Rug Plot n > 7 and Bindea Signatures Only.pdf", fig6a2, width = 2.5, height = 1, units = "in")
-
+ggsave("results/Figure6A.pdf", ggarrange(fig6a1,fig6a2,nrow=2, heights = c(5,1)), width = 3, height = 4, units = "in")
 
 #Panel b
 fig6b <- ggplot(bindea_concordance_dots, aes(x=immune_signature,y=-log10(p.adj))) + geom_point(aes(color = color), size = 0.55) + 
-  scale_color_manual(values= c("#D9D9D9","#FBB4AE")) + theme_classic() + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  scale_color_manual(values= c("#D9D9D9","#FBB4AE")) + theme_classic() + theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.position="none") + 
   xlab("") + ylab("-Log10 Adjusted P-Value")
-ggsave("Figure 6b Cell Signatures Concordance of Metabolites Dot Plot.pdf", fig6b, height = 3.5, width = 2.75)
-
+ggsave("results/Figure6B.pdf", fig6b, height = 3.5, width = 2.75)
 
 #Panel c
 fig6c <- ggplot(histamine_mc_exp, aes(x=Histamine, y=Mast.Cells, color = CancerType)) + geom_smooth(method=lm, se=FALSE, fullrange=TRUE) + 
   theme_classic() + xlab("Histamine") + ylab("Mast Cells") + geom_point(size=0.2) +
   scale_color_manual(values=mapping_color$Color[match(sort(unique(histamine_mc_exp$CancerType)),mapping_color$Name)])
-ggsave("Figure 6c Mast Cells Histamine Correlation Line Plot in Tumors.pdf", fig6c, width = 2.8, height = 2.8, units = "in")
+ggsave("results/Figure6C.pdf", ggarrange(fig6c, common.legend = T), width = 4, height = 4, units = "in")
 
 #Panel d
 fig6d <- ggplot(mastcell_concordance[1:21,], aes(x = -log10(p.adj), y = metabolite)) + 
   geom_bar(stat="identity") + theme_classic() +
   xlab("-Log10 FDR-Corrected P-Value") + ylab("") + ggtitle("Mast Cell Concordance") + 
   geom_vline(xintercept = -log10(0.05), color = "red", linetype ="dashed")
-ggsave("Figure 6d Mast Cells Concordance of Metabolites.pdf", fig6d, height = 2.5, width = 3)
+ggsave("results/Figure6D.pdf", fig6d, height = 2.5, width = 5)
 
 #Panel e
 fig6e <- ggplot(histamine_hdc_exp, aes(x=Histamine, y=HDC, color = CancerType)) + geom_smooth(method=lm, se=FALSE, fullrange=TRUE) + 
   theme_classic() + xlab("Histamine") + ylab("HDC") + geom_point(size=0.2) +
   scale_color_manual(values=mapping_color$Color[match(sort(unique(histamine_hdc_exp$CancerType)),mapping_color$Name)])
-ggsave("Figure 6e HDC Histamine Correlation Line Plot in Tumors.pdf", fig6e, width = 2.7, height = 2.8, units = "in")
+ggsave("results/Figure6E.pdf", ggarrange(fig6e, common.legend = T), width = 4, height = 4, units = "in")
 
 #Panel f
 fig6f <- ggplot(adc_kyn_exp, aes(x=Kynurenine, y=aDC, color = CancerType)) + geom_smooth(method=lm, se=FALSE, fullrange=TRUE) + 
   theme_classic() + xlab("Kynurenine") + ylab("aDC") + geom_point(size=0.2) +
   scale_color_manual(values=mapping_color$Color[match(sort(unique(adc_kyn_exp$CancerType)),mapping_color$Name)])
-ggsave("Figure 6f aDC Kynurenine Correlation Line Plot in Tumors.pdf", fig6f, width = 2.7, height = 2.8, units = "in")
+ggsave("results/Figure6F.pdf", ggarrange(fig6f, common.legend = T), width = 4, height = 4, units = "in")
 
-#### Supplemental Figure 2 ----
+#### Figure S2 ----
+
 supp2 <- ggplot(histamine_concordance, aes(x=pair, y=value)) + geom_boxplot() + 
   theme_classic() + xlab("") + ylab("Concordance") + geom_jitter(shape=16, position=position_jitter(0.2), aes(colour=variable)) +
   scale_color_manual(values=mapping_color$Color[match(sort(unique(histamine_concordance$variable)),mapping_color$Name)]) +
-  theme(axis.text.x = element_text(angle = 345))
-ggsave("Supp Figure 2 Mast Cells Histmamine Concordance Boxplot in Tumors.pdf", supp2, width = 2, height = 3, units = "in")
+  theme(axis.text.x = element_text(angle = 345, hjust = 0))
+ggsave("results/FigureS2.pdf", ggarrange(supp2, common.legend = T), width = 4, height = 4, units = "in")

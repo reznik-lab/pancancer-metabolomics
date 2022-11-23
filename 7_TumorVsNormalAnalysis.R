@@ -1,4 +1,8 @@
 #### Initialize ----
+
+# set working directory to source file location
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
 library(data.table)
 library(tidyr)
 library(plyr)
@@ -8,14 +12,11 @@ library(ggrepel)
 library(edgeR)
 library(limma)
 
-# set working directory to source file location
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-
 #########
 # differential gene expression test
 #########
 
-# cancer types both have tumor and normal data
+# define cancer types with both tumor and normal data
 selectedDataSetList<-c("BRCA1",
                        "GBM",
                        "COAD",
@@ -23,7 +24,6 @@ selectedDataSetList<-c("BRCA1",
                        "PRAD",
                        "ccRCC3",
                        "ccRCC4")
-
 
 setWithRNAseq<-c("BRCA2",
                  "HurthleCC",#
@@ -183,20 +183,18 @@ for(idx in 1:length(selectedDataSetList)){
   
 }
 
-
-
 ##########
 # differential abundance test
 ##########
 
-# cancer types both have tumor and normal data
-selectedDataSetList<-c("BRCA1",
-                       "GBM",
-                       "COAD",
-                       "PDAC",
-                       "PRAD",
-                       "ccRCC3",
-                       "ccRCC4")
+# # select cancer types with both have tumor and normal data
+# selectedDataSetList<-c("BRCA1",
+#                        "GBM",
+#                        "COAD",
+#                        "PDAC",
+#                        "PRAD",
+#                        "ccRCC3",
+#                        "ccRCC4")
 
 for(idx in 1:length(selectedDataSetList)){
   
@@ -227,8 +225,6 @@ for(idx in 1:length(selectedDataSetList)){
     normal_ITHID<-masterMappingDatSubset[normal_commonID,]$ITHID
     normal_MetabID<-masterMappingDatSubset[normal_commonID,]$MetabID
     
-  
-  
   ######
   # load metabolite abundance
   ######
@@ -265,6 +261,7 @@ for(idx in 1:length(selectedDataSetList)){
   #####
   # handling normal samples
   #####
+  
   filePath<-"data/metabolomics_processed"
   tmpStr<-masterMappingDatSubset[masterMappingDatSubset$TN %in% "Normal",]$MetabFile[1]
   fileName<-tmpStr
@@ -321,13 +318,12 @@ for(idx in 1:length(selectedDataSetList)){
   ######
     
     diffMetaboliteAbundance = function(x,ix1,ix2,outputfilePath = NULL,makeBoxPlot=FALSE,ressort = TRUE){
-      # Ed reznik wrote the initial version
+      # Ed Reznik wrote the initial version
       # do standard differential abundance analysis.
       # x is a matrix, metabolites x samples
       # ix1,ix2 are column names for the two groups to compare. WE COMPARE GROUP 2 TO GROUP 1!
       
       # do differential abundance with mann-whitney tests, calculate p-value, FDR correct, return
-      
       
       res = data.frame()
       
@@ -438,9 +434,6 @@ for(idx in 1:length(selectedDataSetList)){
   write.table(res,file=fileName,sep="\t",quote=FALSE,row.names=FALSE,col.names = TRUE)
   
 }
-
-
-
 
 ##########
 # start of making aggregated summary
