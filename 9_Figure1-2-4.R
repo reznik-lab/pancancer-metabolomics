@@ -1,7 +1,7 @@
 #### Initialize ----
 
-zap()
-setwd("/Users/elb4003/Work/PostDocWCM/Projects/MetaboPanCan/MetaboRNA/")
+# set working directory to source file location
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 library(readxl)
 library(tidyverse)
@@ -27,57 +27,7 @@ library(patchwork)
 library(ggbreak)
 library(xlsx)
 
-# check if directory to save results exists, otherwise create
-if(!dir.exists(paste0(Sys.Date(),sep=""))) {
-  dir.create(paste0(Sys.Date(),sep=""))
-}
-
-#### Load Data ----
-
-# load master mapping file
-mapping_file <- read.csv2(file = "Files2Share/MasterMapping_MetImmune_03_16_2022.csv", sep=",") 
-
-load("Files2Share/PreprocessedData.Rdata")
-
-load("Files2Share/Annotations_Metabolon_Metabolites.Rdata")
-load("Files2Share/Annotations_Pathways.Rdata")
-
-load("Files2Share/Results_Concordance_MetaAnalysis.Rdata")
-load("Files2Share/Results_FisherPathwayEnrichment.Rdata")
-
-mapping_color <- data.frame(OldName= c("BRCA_Terunuma","BRCA_Tang","COAD","CPTAC_GBM","DLBCL",
-                                       "HCC","LiCa1","LiCa2","OV","PDAC",
-                                       "PRAD","RC12","RC18","RC18_2","RC20"),
-                            NewName = c("BRCA1","BRCA2","COAD","GBM","DLBCL",
-                                        "HurthleCC","HCC","ICC","OV","PDAC",
-                                        "PRAD","ccRCC1","ccRCC2","ccRCC3","ccRCC4")) %>%
-  dplyr::arrange(NewName) %>%
-  dplyr::mutate(Color = c("#e5b6a5","#c3c1a4","#e5e3c0","#bbe1b9","#88beab",
-                        "#97b1ab","#abc5bf","#abe7e1","#c6e6e7","#8fcde1",
-                        "#88aee1","#a6b7d3","#d2d5ed","#c8b7de","#e6bbcc"))
-
-#### Set plotting parameters  ----
-
-# x <- "T"
-# significance threshold on the FDR adjusted p-values
-pcut <- 0.01
-# cutoff on the number of datasets a metabolite must be present in
-n_data_cut <- 7
-
-# rename variable
-res_conc <- conc
-remove(conc)
-
-#### Write Significant GMIs to file ----
-
-write.table(x=res_conc %>%
-              dplyr::filter(n_dataset>n_data_cut) %>%
-              dplyr::filter(padj<pcut),
-            file=sprintf("%s/TableS1.txt", Sys.Date()),
-            append = FALSE, sep = " ", dec = ".",
-            row.names = TRUE, col.names = TRUE)
-
-#### Define Functions ----
+#### Helper Functions ----
 
 # generate piedonut ----
 # modified from the webr PieDonut function
@@ -530,30 +480,74 @@ moveme <- function (invec, movecommand) {
   myVec
 }
 
-#### Create ausiliary variables ----
+#### Load Data ----
+
+# load master mapping file
+mapping_file <- read.csv2(file = "data/MasterMapping_MetImmune_03_16_2022_release.csv", sep=",") 
+
+# load preprocessed data
+load("results/Workspace_3_FilterMetabo.Rdata")
+load("results/Workspace_4_FilterRNA.Rdata")
+
+# load metabolite annotations
+load("data_for_scripts/Concordance/Annotations_Metabolon_Metabolites.Rdata")
+# load pathway annotations
+load("data_for_scripts/Concordance/Annotations_Pathways.Rdata")
+
+# load concordance meta analysis results
+if(file.exists("results/Workspace_5_ConcordanceMetaAnalysis.Rdata")){
+  load("results/Workspace_5_ConcordanceMetaAnalysis.Rdata")
+} else {
+  load("data_for_scripts/Concordance/ConcordanceMetaAnalysis.Rdata")
+}
+
+# load pathway enrichment analysis results
+if(file.exists("results/Workspace_6_ConcordancePathwayEnrichmentAnalysis.Rdata")){
+  load("results/Workspace_6_ConcordancePathwayEnrichmentAnalysis.Rdata")
+} else {
+  load("data_for_scripts/Concordance/ConcordancePathwayEnrichmentAnalysis.Rdata")
+}
+
+#### Set plotting parameters  ----
+
+# significance threshold on the FDR adjusted p-values
+pcut <- 0.01
+# cutoff on the number of datasets a metabolite must be present in
+n_data_cut <- 7
+
+# rename variable
+res_conc <- conc
+remove(conc)
+
+# set plotting colors for each dataset
+mapping_color <- data.frame(OldName= c("BRCA_Terunuma","BRCA_Tang","COAD","CPTAC_GBM","DLBCL",
+                                       "HCC","LiCa1","LiCa2","OV","PDAC",
+                                       "PRAD","RC12","RC18","RC18_2","RC20"),
+                            NewName = c("BRCA1","BRCA2","COAD","GBM","DLBCL",
+                                        "HurthleCC","HCC","ICC","OV","PDAC",
+                                        "PRAD","ccRCC1","ccRCC2","ccRCC3","ccRCC4")) %>%
+  dplyr::arrange(NewName) %>%
+  dplyr::mutate(Color = c("#e5b6a5","#c3c1a4","#e5e3c0","#bbe1b9","#88beab",
+                          "#97b1ab","#abc5bf","#abe7e1","#c6e6e7","#8fcde1",
+                          "#88aee1","#a6b7d3","#d2d5ed","#c8b7de","#e6bbcc"))
 
 # create a mapping dataframe
 df <- met_all %>% sapply(ncol) %>% as.data.frame %>% 
   dplyr::rename(n=".") %>% 
   tibble::rownames_to_column("dataset") %>%
-  dplyr::arrange(dataset) %>%
-  dplyr::mutate(corcol=paste(dataset,"_cor",sep=""))
+  dplyr::arrange(dataset) 
 df %<>%
-  dplyr::mutate(corcol=ifelse(grepl(pattern = "_Tumor", x=df$dataset, fixed = T),
-                              gsub(pattern = "_Tumor",replacement = "",x = corcol),corcol)) %>%
-  # change one entry manually to match result dataframe
-  dplyr::mutate(corcol=ifelse(corcol=="RC18_2_Normal_cor","RC18_Normal_2_cor",corcol)) %>%
   dplyr::mutate(tissue=ifelse(grepl(pattern = "_Tumor", x=df$dataset, fixed = T),"Tumor","Normal"))
 
 # merge renaming and coloring variables
 df %<>% 
   dplyr::mutate(cohort=sub("_[^_]+$", "", dataset)) %>% 
-  dplyr::left_join(mapping_color, by=c("cohort"="OldName"))
+  dplyr::left_join(mapping_color, by=c("cohort"="NewName"))
 
-#### Figure 1 - Dataset Overview ----
+#### Figure 1A ----
 
 # Sample Size Overview
-pdf(sprintf("%s/Figure1A.pdf", Sys.Date()), width=5, height=5, onefile = F)
+pdf("results/Figure1A.pdf", width=5, height=5, onefile = F)
 print(
   sapply(met_all, ncol) %>% unlist %>%
   as.data.frame %>% 
@@ -563,8 +557,8 @@ print(
   dplyr::mutate(cohort=ifelse(tissue=="Tumor",
                               str_remove(string=key,pattern = "_Tumor"),
                               str_remove(string=key,pattern = "_Normal"))) %>%
-  dplyr::left_join(mapping_color, by=c("cohort"="OldName")) %>% 
-  PieDonut_edited(aes(NewName,tissue,count=value),
+  dplyr::left_join(mapping_color, by=c("cohort"="NewName")) %>% 
+  PieDonut_edited(aes(cohort,tissue,count=value),
            r0=0.3,showPieName=FALSE,showRatioThreshold = F,
            explodeDonut = F, selected=c(1:15),
            explodePie = F, explode = c(1:15), explodePos = 0.3,
@@ -573,82 +567,53 @@ print(
   vp = viewport(height = 1, width = 1))
 dev.off()
 
-# Transcripts overlap across datasets
-p_rna <- lapply(mapping_color$OldName %>% {names(.)=.;.}, function(x){
-  # get list of metabolites per cohort
-  n_met=rna_all %>% lapply(rownames) %>% multiIntersect() %>% 
-    dplyr::select(any_of(c(paste0(x,"_Tumor"),paste0(x,"_Normal")))) %>% 
-    dplyr::mutate(n=rowSums(.)) %>% 
-    dplyr::mutate(count=ifelse(n>0,1,0)) %>% 
-    dplyr::filter(count==1) %>% 
-    rownames
-}) %>% 
-  multiIntersect %>% 
-  dplyr::mutate(ntot=rowSums(.)) %>% 
-  dplyr::select(ntot) %>% 
-  table(dnn="ntot") %>% as.data.frame %>% 
-  dplyr::mutate(ntot=as.numeric(ntot)) %>%
-  dplyr::arrange(-ntot) %>% 
-  dplyr::mutate(n_cumul = cumsum(Freq)) %>%
-  dplyr::mutate(omics="Transcriptomics") %>% 
-  ggplot(aes(x=factor(ntot), y=n_cumul, group=omics)) +
-  geom_line(color="grey60") +
-  geom_point() +
-  xlab("Number of datasets") +
-  ylab("Number of common Transcripts") +
-  ylim(c(0,45000)) +
+#### Figure 2A ----
+
+# volcano plot
+p_volc <- res_conc %>%
+  dplyr::filter(n_dataset>n_data_cut) %>%
+  dplyr::mutate(repl=case_when(padj>=pcut ~ "not_significant",
+                               padj<pcut & !(distance %in% c(1,2)) ~ "significant",
+                               padj<pcut & distance %in% c(1,2) ~ "significant_proximal")) %>%
+  dplyr::mutate(label=ifelse(padj<1E-10 & distance<=2,
+                             sprintf("%s - %s", gene, metabolite),NA)) %>% 
+  # order points for plotting
+  dplyr::mutate(var=case_when(repl=="not_significant"~1,repl=="significant"~2,repl=="significant_proximal"~3)) %>%
+  dplyr::arrange(var) %>% 
+  ggplot(aes(x=2*concordance-1, y=-log10(padj),
+             label=label)) +
+  geom_point(aes(color=repl), alpha=0.7, size=0.3) +
+  geom_text_repel(size=2) +
+  xlab("2*concordance-1") +
+  ylab("-log10(adjusted p-value)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 36)) +
+  scale_color_manual(values=c("significant_proximal"="gray30","significant"="gray30","not_significant"="gray80")) +
+  geom_hline(yintercept = -log10(pcut), linetype="dashed", color="gray30") +
+  geom_vline(xintercept = 0, linetype="dashed", color="gray30") +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        axis.text.y = element_text(color = "black"), axis.text.x = element_text(color = "black"),
         text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),legend.position="none")
-# save to file
-pdf(sprintf("%s/FigureS4A.pdf", Sys.Date()), width=3.5, height=3.5, onefile = F)
-print(p_rna)
-dev.off()
 
-# Metabolites overlap across datasets
-p_met <- lapply(mapping_color$OldName %>% {names(.)=.;.}, function(x){
-  # get list of metabolites per cohort
-  n_met=met_all %>% lapply(rownames) %>% multiIntersect() %>% 
-    dplyr::select(any_of(c(paste0(x,"_Tumor"),paste0(x,"_Normal")))) %>% 
-    dplyr::mutate(n=rowSums(.)) %>% 
-    dplyr::mutate(count=ifelse(n>0,1,0)) %>% 
-    dplyr::filter(count==1) %>% 
-    rownames
-}) %>% 
-  multiIntersect %>%
-  dplyr::mutate(ntot=rowSums(.)) %>%
-  dplyr::select(ntot) %>% 
-  table(dnn="ntot") %>% as.data.frame %>% 
-  dplyr::mutate(ntot=as.numeric(ntot)) %>%
-  dplyr::arrange(-ntot) %>% 
-  dplyr::mutate(n_cumul = cumsum(Freq)) %>% 
-  dplyr::mutate(omics="Metabolomics") %>%
-  ggplot(aes(x=factor(ntot), y=n_cumul, group=omics)) +
-  geom_line(color="grey60") +
-  geom_point() +
-  xlab("Number of datasets") +
-  ylab("Number of common Metabolites") +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-        panel.background = element_blank(), axis.line = element_line(colour = "black"),
-        text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),legend.position="none")
-# save to file
-pdf(sprintf("%s/FigureS4B.pdf", Sys.Date()), width=3.5, height=3.5, onefile = F)
-print(p_met)
-dev.off()
+# save as png
+warning("Saving the volcano plot to file will take a little while. Please wait.")
+ggsave(p_volc, filename = "results/Figure2A.png", width=2, height=2, units = "in")
 
-#### Pathway Distance Analysis  ----
+#### Figure 2B ----
 
-# short distance: GEM dist <=2
+# classify gene-metabolite pairs based on significance (padj<0.01) and short distance (distance<=2)
 dt <- res_conc %>%
   dplyr::filter(n_dataset>n_data_cut) %>%
   dplyr::mutate(is_significant=ifelse(padj<pcut,1,0) %>% factor(levels = c(1,0))) %>%
-  dplyr::mutate(is_close=ifelse(dist_GEM_min <=2 & !is.na(dist_GEM_min),1,0) %>% factor(levels = c(1,0))) 
+  dplyr::mutate(is_close=ifelse(distance <=2 & !is.na(distance),1,0) %>% factor(levels = c(1,0))) 
 
+# compute Fisher's exact test
 contab <- dt %>%
   dplyr::select(is_significant, is_close) %>%
   table
 fisher.test(contab, alternative="greater")
 
+# create barplot
 m_breaks <- as.numeric(c(seq(0,0.05,0.005), seq(0.1,1,0.1)))
 p_proximal_barplot <- contab %>% as.data.frame %>%
   dplyr::group_by(is_significant) %>%
@@ -666,171 +631,11 @@ p_proximal_barplot <- contab %>% as.data.frame %>%
   ylab("Percentage") +
   scale_y_break(c(0.025, 0.95))
 
-pdf(sprintf("%s/Figure3A.pdf", Sys.Date()), height = 4, width = 2, onefile=F)
+pdf("results/Figure2B.pdf", height = 4, width = 2, onefile=F)
 print(p_proximal_barplot)
 dev.off()
 
-#### Piecharts ----
-
-# piecharts
-p_pie_proximal <- contab %>% as.data.frame %>%
-  dplyr::filter(is_close==1) %>%
-  dplyr::mutate(label=ifelse(is_significant==1,"significant","non significant")) %>%
-  dplyr::mutate(prop = Freq / sum(.$Freq) *100) %>% 
-  dplyr::mutate(text=sprintf("%.2f%%",prop)) %>% 
-  ggplot(aes(x="", y=Freq, fill=label)) +
-  geom_bar(stat="identity", width=1, color="white") +
-  geom_text(aes(y = prop*prop, x=1, label = text)) +
-  coord_polar("y", start=0) +
-  scale_fill_manual(values = c("gray80","firebrick")) +
-  theme_void() +
-  theme(text=element_text(size=7)) +
-  ggtitle("Proximal gene-metabolite pairs")
-# save to file
-pdf(sprintf("%s/Piechart_proximal.pdf", Sys.Date()), height = 2, width = 3, onefile=F)
-print(p_pie_proximal)
-dev.off()
-
-# piecharts
-p_pie_significant <- contab %>% as.data.frame %>%
-  dplyr::filter(is_significant==1) %>%
-  dplyr::mutate(label=ifelse(is_close==1,"proximal","non proximal")) %>%
-  dplyr::mutate(prop = Freq / sum(.$Freq) *100) %>% 
-  dplyr::mutate(text=sprintf("%.2f%%",prop)) %>% 
-  ggplot(aes(x="", y=Freq, fill=label)) +
-  geom_bar(stat="identity", width=1, color="white") +
-  geom_text(aes(y = prop*prop/2, x=1, label = text)) +
-  coord_polar("y", start=0) +
-  scale_fill_manual(values = c("gray80","firebrick")) +
-  theme_void() +
-  theme(text=element_text(size=7)) +
-  ggtitle("Significant GMIs")
-# save to file
-pdf(sprintf("%s/Piechart_significant.pdf", Sys.Date()), height = 2, width = 3, onefile=F)
-print(p_pie_significant)
-dev.off()
-
-#### Hubs missingness ----
-
-# compute number of missing values for all metabolites in each dataset
-miss_met <- met_all[grep(pattern = "Tumor",x=names(met_all), value = T)] %>%
-  lapply(function(x){
-    x %>% apply(1, function(m){
-      sum(m==min(m))
-    }) %>% t %>% as.data.frame 
-  }) %>% {Reduce(f = full_join, x = .)} %>% 
-  as.data.frame
-rownames(miss_met) <- names(met_all[grep(pattern = "Tumor",x=names(met_all), value = T)])
-# compute total number of missing values
-tot_miss <- miss_met %>% colSums(na.rm = T) 
-
-# compute number of measurements for each metabolite
-tot_n <- met_all[grep(pattern = "Tumor",x=names(met_all), value = T)] %>%
-  lapply(function(x){
-    x %>% apply(1, function(m){
-      length(m)
-    }) %>% t %>% as.data.frame 
-  }) %>% {Reduce(f = full_join, x = .)} %>% 
-  as.data.frame %>%
-  colSums(na.rm = T)
-
-# select metabolites that are used for analysis
-mm <- res_conc %>%
-  dplyr::filter(n_dataset>n_data_cut) %>% 
-  dplyr::pull(metabolite) %>% unique
-
-dt_miss <- miss_met %>%
-  t %>% as.data.frame %>%
-  dplyr::mutate(missing_n=rowSums(., na.rm = T)) %>%
-  tibble::rownames_to_column("metabolite") %>%
-  dplyr::left_join(tot_n %>% as.data.frame %>% dplyr::rename(tot_n=".") %>% tibble::rownames_to_column("metabolite"),
-                   by="metabolite") %>%
-  dplyr::mutate(missing_frac=missing_n/tot_n) %>%
-  dplyr::mutate(hub=ifelse(metabolite %in% topmet, "yes","no")) %>%
-  dplyr::mutate(meta_analysis=ifelse(metabolite %in% mm, "yes","no")) 
-
-# dt_miss %>%
-#   dplyr::filter(meta_analysis=="yes") %>%
-#   ggplot(aes(x=hub,y=missing_frac)) +
-#   geom_boxplot(outlier.shape=NA) +
-#   geom_point(position=position_jitter(width = 0.2)) +
-#   theme_bw() 
-
-wilcox.test(x=dt_miss %>% dplyr::filter(meta_analysis=="yes") %>% dplyr::filter(hub=="yes") %>% dplyr::pull(missing_frac),
-            y=dt_miss %>% dplyr::filter(meta_analysis=="yes") %>% dplyr::filter(hub=="no") %>% dplyr::pull(missing_frac))$p.value
-
-# save missing data to file
-write.table(x=dt_miss %>% 
-              dplyr::filter(meta_analysis=="yes"),
-            file=sprintf("%s/Table_metabolite_missing.txt", Sys.Date()),
-            append = FALSE, sep = " ", dec = ".",
-            row.names = TRUE, col.names = TRUE)
-
-#### Volcano Plot ----
-
-# volcano plot
-p_volc <- res_conc %>%
-  dplyr::filter(n_dataset>n_data_cut) %>%
-  # dplyr::left_join(dt_ccle %>% dplyr::select(metabolite,gene,color), by=c("metabolite","gene")) %>%
-  dplyr::mutate(repl=case_when(padj>=pcut ~ "not_significant",
-                               padj<pcut & !(dist_GEM_min %in% c(1,2)) ~ "significant",
-                               padj<pcut & dist_GEM_min %in% c(1,2) ~ "significant_proximal")) %>%
-  dplyr::mutate(label=ifelse(padj<1E-10 & dist_GEM_min<=2,
-                             sprintf("%s - %s", gene, metabolite),NA)) %>% 
-  # order points for plotting
-  dplyr::mutate(var=case_when(repl=="not_significant"~1,repl=="significant"~2,repl=="significant_proximal"~3)) %>%
-  dplyr::arrange(var) %>% 
-  ggplot(aes(x=2*concordance-1, y=-log10(padj),
-             label=label)) +
-  geom_point(aes(color=repl), alpha=0.7, size=0.3) +
-  # geom_text_repel(size=2) +
-  xlab("2*concordance-1") +
-  ylab("-log10(adjusted p-value)") +
-  scale_y_continuous(expand = c(0, 0), limits = c(0, 36)) +
-  scale_color_manual(values=c("significant_proximal"="gray30","significant"="gray30","not_significant"="gray80")) +
-  geom_hline(yintercept = -log10(pcut), linetype="dashed", color="gray30") +
-  geom_vline(xintercept = 0, linetype="dashed", color="gray30") +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-        panel.background = element_blank(), axis.line = element_line(colour = "black"),
-        axis.text.y = element_text(color = "black"), axis.text.x = element_text(color = "black"),
-        text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),legend.position="none")
-
-# save as png
-ggsave(p_volc,filename = sprintf("%s/Figure2A.png", Sys.Date()), width=2, height=2, units = "in")
-
-# concordance distribution
-p_conc_distr <- res_conc %>%
-  dplyr::filter(n_dataset>7) %>%
-  dplyr::filter(padj<0.01) %>% 
-  tidyr::pivot_longer(cols = grep(colnames(res_conc), pattern="_Tumor", value = T), names_to = "dataset", values_to = "conc") %>% 
-  dplyr::filter(gene %in% c("IDO1","GDA","CD38") & metabolite %in% c("kynurenine","guanine","nicotinamide ribonucleotide (NMN)")) %>% 
-  dplyr::mutate(label=sprintf("%s_%s",gene,metabolite)) %>% 
-  dplyr::mutate(dataset=str_remove(dataset, pattern = "_Tumor") %>% factor(levels=mapping_color$OldName)) %>%
-  ggplot(aes(x=label, y=2*conc-1)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_point(aes(color=dataset), position = position_jitter(width = 0.2)) +
-  scale_color_manual(values = mapping_color$Color) +
-  ylab("Concordance") +
-  xlab("") +
-  ylim(c(-1,1)) +
-  theme_bw() +
-  theme(text=element_text(size=7), axis.text=element_text(size=7), 
-        axis.title=element_text(size=7), 
-        legend.position = "none")
-
-# save as pdf
-pdf(sprintf("%s/FigureS1.pdf", Sys.Date()), width=2.5, height=2.5)
-print(p_conc_distr)
-dev.off()
-
-#### Gene Prioritization ----
-
-# # metabolites with at least one proximal GMI
-# proximal_met <- res_conc %>%
-#   dplyr::filter(n_dataset>n_data_cut) %>%
-#   dplyr::filter(padj<pcut) %>%
-#   dplyr::filter(dist_GEM_min <= 2) %>% 
-#   dplyr::pull(metabolite) %>% unique
+#### Figure 2C ----
 
 # select metabolites whose strongest GMI is proximal
 proximal_met <- res_conc %>%
@@ -843,13 +648,13 @@ proximal_met <- res_conc %>%
   dplyr::filter(padj==min(padj)) %>% 
   dplyr::ungroup() %>% 
   # keep only proximal GMIs
-  dplyr::filter(dist_GEM_min<=2) %>%
+  dplyr::filter(distance<=2) %>%
   # extract metabolites
   dplyr::pull(metabolite)
 
 dt_proximal <- res_conc %>%
   dplyr::filter(n_dataset>n_data_cut) %>%
-  dplyr::filter(dist_GEM_min <= 2) %>% 
+  dplyr::filter(distance <= 2) %>% 
   dplyr::filter(metabolite %in% proximal_met) %>% 
   dplyr::select(metabolite,gene,padj) %>% 
   group_by(metabolite) %>%
@@ -865,7 +670,7 @@ dt_proximal <- res_conc %>%
 dt_not_proximal <- res_conc %>%
   dplyr::filter(n_dataset>n_data_cut) %>%
   dplyr::filter(padj<pcut) %>%
-  dplyr::filter(dist_GEM_min > 2 | is.na(dist_GEM_min)) %>% 
+  dplyr::filter(distance > 2 | is.na(distance)) %>% 
   dplyr::filter(metabolite %in% unique(dt_proximal$metabolite)) %>% 
   dplyr::select(metabolite,gene,padj) %>% 
   group_by(metabolite) %>%
@@ -880,11 +685,8 @@ dt_not_proximal <- res_conc %>%
 
 dt_prio <- dt_proximal %>%
   rbind(dt_not_proximal) %>%
-  # dplyr::filter(padj<pcut) %>%
   dplyr::group_by(metabolite) %>%
   dplyr::arrange(padj) %>%
-  # only keep top 3 strongest GMIs per metabolite
-  # dplyr::filter(row_number() %in% c(1:10)) %>% 
   # compute difference to strongest GMI
   dplyr::mutate(gap=-log10(padj[row_number()==1])+log10(padj[row_number()==2]))
 
@@ -905,65 +707,45 @@ p_proximal <- dt_prio %>%
         axis.text.y = element_text(color = "black"),
         axis.text.x = element_text(angle = 90, vjust = 1, hjust=1, color="black")) 
 
-# p_proximal <-  dt_prio %>%
-#   ggplot(aes(x=-log10(padj), y=metabolite, label=label)) +
-#   geom_point(aes(color=color), size=0.1) +
-#   geom_text_repel(size=2) +
-#   scale_color_manual(values=c("gray80","firebrick","black")) +
-#   ylab("") +
-#   xlab("-log10(adjusted p-value)") +
-#   coord_flip() +
-#   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-#         panel.background = element_blank(), axis.line = element_line(colour = "black"),
-#         text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7), legend.position="none",
-#         axis.text.y = element_text(color = "black"),
-#         axis.text.x = element_text(angle = 90, vjust = 1, hjust=1, color="black"))
-
-pdf(sprintf("%s/Figure2B.pdf", Sys.Date()), width=7, height=5)
+pdf("results/Figure2C.pdf", width=7, height=5)
 print(p_proximal)
 dev.off()
 
-save(dt_prio,file=sprintf("%s/Figure2BData.Rdata", Sys.Date()))
+#### Figure 2D,2E,2H,2J ----
 
-#### Scatter Plots ----
-
+# extract information for scatterplots
 pp <- data.frame(metabolite= c("kynurenine","tryptophan",
-                               "glutathione, oxidized (GSSG)","cystine",
-                               "guanine","taurine")) %>%
+                               "glutathione, oxidized (GSSG)")) %>%
   dplyr::left_join(dt_proximal, by="metabolite") %>%
   dplyr::filter(!is.na(label)) %>%
-  dplyr::select(metabolite, gene)
+  dplyr::select(metabolite, gene) %>%
+  # add negative controls
+  rbind(data.frame(metabolite="kynurenine",gene="AFMID")) 
 
-# add negative controls
-pp %<>%
-  rbind(data.frame(metabolite="kynurenine",gene="AFMID")) %>%
-  rbind(data.frame(metabolite="tryptophan",gene="AFMID"))
-
+# generate scatter plots
 plist <- lapply(1:nrow(pp), function(k){
   
   met_name <- pp %>% dplyr::pull(metabolite) %>% .[k]
   gene_name <- pp %>% dplyr::pull(gene) %>% .[k]
   
   dd <- lapply(met_all[df %>% dplyr::filter(tissue=="Tumor") %>% dplyr::pull(dataset)] %>% names %>% {names(.)=.;.}, function(x){
-    # R.utils::printf("%s: %s\n",x, met_name %in% rownames(met_all[[x]]))
+    
     if(met_name %in% rownames(met_all[[x]])){
-      data.frame(met=met_all[[x]] %>% t %>% as.data.frame %>% dplyr::pull(met_name) %>% scale,#rank %>% {./length(.)},
-                 gene= rna_all[[x]] %>% t %>% as.data.frame %>% dplyr::pull(gene_name) %>% scale,#rank %>% {./length(.)},
-                 dataset=df %>% dplyr::filter(dataset==x) %>% dplyr::pull(NewName))
+      data.frame(met=met_all[[x]] %>% t %>% as.data.frame %>% dplyr::pull(met_name) %>% scale,
+                 gene= rna_all[[x]] %>% t %>% as.data.frame %>% dplyr::pull(gene_name) %>% scale,
+                 dataset=df %>% dplyr::filter(dataset==x) %>% dplyr::pull(cohort))
     }
   }) %>%
     {do.call(rbind,.)} %>% as.data.frame
   
   dd %>%
-    # dplyr::filter(dataset %in% c("ccRCC2","ccRCC4","BRCA2","HurthleCC","OV")) %>%
     ggplot(aes(x=met, y=gene)) +
     geom_point(aes(color=dataset), alpha=0.5, size=0.2) +
     xlab(met_name) +
     ylab(gene_name) +
     geom_smooth(aes(color=dataset), method=MASS::rlm, se=F, size=0.5) +
-    # geom_smooth(method="lm", se=F, size=0.5, color="gray40") +
     scale_color_manual(values=mapping_color$Color %>% setNames(mapping_color$NewName)) +
-    ggtitle(sprintf("%s - %s", met_name, gene_name)) +
+    ggtitle(sprintf("%s - %s", gene_name, met_name)) +
     theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
           panel.background = element_blank(), axis.line = element_line(colour = "black"),
           text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),
@@ -972,10 +754,22 @@ plist <- lapply(1:nrow(pp), function(k){
           axis.text.x = element_text(color="black"))
 })
 
+# save to file
+pdf("results/Figure2DEHJ.pdf", width=6, height=6, onefile = F)
+print(
+ggarrange(plotlist=list(plist[[1]],plist[[4]],plist[[2]],plist[[3]]), 
+          ncol=2, nrow=2,
+          labels = c("D","E","H","J"),
+          common.legend = F)
+)
+dev.off()
+
+#### Figure 2K ----
+
 # Validation data from Priolo et al. (2018) doi: 10.1073/pnas.1710849115
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6142242/
 val_met <- c("glutathione disulfide-nega")
-ggt1_ko <- read_excel(path="Files2Share/pnas.1710849115.sd06.xlsx", sheet = "scaled data")
+ggt1_ko <- read_excel(path="data_for_scripts/Concordance/pnas.1710849115.sd06.xlsx", sheet = "scaled data")
 
 group <- ggt1_ko[1,2:ncol(ggt1_ko)] %>% t %>% as.data.frame %>%
   tibble::rownames_to_column("ID") %>%
@@ -990,7 +784,7 @@ dt_val <- ggt1_ko %>%
   tibble::rownames_to_column("ID") %>%
   dplyr::left_join(group, by="ID") %>% 
   dplyr::filter(group %in% c("siCtrl","siGGT1")) %>%
-  tidyr::pivot_longer(cols=val_met) %>% 
+  tidyr::pivot_longer(cols=all_of(val_met)) %>% 
   dplyr::mutate(value=as.numeric(value))
 
 sapply(val_met %>% {names(.)=.;.}, function(m){
@@ -1007,7 +801,6 @@ sapply(val_met %>% {names(.)=.;.}, function(m){
 }) %>% as.data.frame()
 
 plist_GGT1 <- lapply(c("glutathione disulfide-nega") %>% {names(.)=.;.}, function(m){
-  m <- "glutathione disulfide-nega"
   x <- dt_val %>%
     dplyr::filter(group=="siCtrl") %>%
     dplyr::filter(name==m) %>%
@@ -1023,7 +816,7 @@ plist_GGT1 <- lapply(c("glutathione disulfide-nega") %>% {names(.)=.;.}, functio
     ggplot(aes(x=group, y=value)) +
     geom_boxplot(outlier.shape = NA) +
     geom_jitter(width = 0.2) +
-    ggtitle(sprintf("p-value:%.2e",wilcox.test(x=x, y=y)$p.value)) +
+    ggtitle(sprintf("Priolo et al. (2018), p-value:%.2e",wilcox.test(x=x, y=y)$p.value)) +
     xlab("") +
     ylab(m) +
     coord_flip() +
@@ -1036,18 +829,13 @@ plist_GGT1 <- lapply(c("glutathione disulfide-nega") %>% {names(.)=.;.}, functio
 })
 
 # save to file
-pdf(sprintf("%s/Figure2CH.pdf", Sys.Date()), width=5, height=7, onefile = F)
-print(
-ggarrange(plotlist=list(plist[[1]],plist[[3]],plist[[11]],plist[[12]],plist[[5]],plist_GGT1[[1]]), 
-          ncol=2, nrow=3,
-          labels = LETTERS[3:8],
-          common.legend = T)
-)
+pdf("results/Figure2K.pdf", width=3, height=3, onefile = F)
+print(plist_GGT1[[1]])
 dev.off()
   
-#### Top Correlated Metabolites ----
+#### Figure 4AB ----
 
-# get ranked order of metabolites and genes for plotting
+# get ranked order of metabolites with most GMIs
 metlevels <- res_conc %>%
   dplyr::filter(n_dataset>n_data_cut) %>%
   dplyr::filter(padj < pcut) %>%
@@ -1056,7 +844,7 @@ metlevels <- res_conc %>%
   dplyr::arrange(-Freq) %>%
   dplyr::pull(metabolite)
 
-# select top k correlated metabolites and genes
+# select top k correlated metabolites
 k <- 10
 topmet <- metlevels[1:k] %>% as.character()
 
@@ -1070,6 +858,7 @@ dt_mostcorr <- res_conc %>%
   dplyr::arrange(Freq) %>% 
   dplyr::mutate(metabolite=factor(metabolite, levels = metlevels))
 
+# create plot for top correlated metabolites
 ppw_met <- dt_mostcorr %>%  
   ggplot(aes(x=as.integer(metabolite), y=Freq, group=1)) +
   # geom_line() +
@@ -1089,13 +878,7 @@ ppw_met <- dt_mostcorr %>%
         text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),
         legend.position="none")
 
-
-pdf(sprintf("%s/Figure4A.pdf", Sys.Date()), width=3, height=3, onefile=F)
-print(ppw_met)
-dev.off()
-
-#### Top Correlated Genes ----
-
+# get ranked order of genes with most GMIs
 genelevels <- res_conc %>%
   dplyr::filter(n_dataset>n_data_cut) %>%
   dplyr::filter(padj < pcut) %>%
@@ -1104,7 +887,7 @@ genelevels <- res_conc %>%
   dplyr::arrange(-Freq) %>%
   dplyr::pull(gene)
 
-# select top k correlated metabolites and genes
+# select top k correlated genes
 k <- 10
 topgene <- genelevels[1:k] %>% as.character()
 
@@ -1118,6 +901,7 @@ dt_mostcorr_gene <- res_conc %>%
   dplyr::arrange(Freq) %>% 
   dplyr::mutate(gene=factor(gene, levels = genelevels))
 
+# create plot for top correlated genes
 ppw_gene <- dt_mostcorr_gene %>%  
   ggplot(aes(x=as.integer(gene), y=Freq, group=1)) +
   geom_point(aes(color=ifelse(!is.na(dt_mostcorr_gene$label),"hub","non_hub")),size=0.1) +
@@ -1135,12 +919,11 @@ ppw_gene <- dt_mostcorr_gene %>%
         text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),
         legend.position="none")
 
-
-pdf(sprintf("%s/Figure4B.pdf", Sys.Date()), width=3, height=3, onefile=F)
-print(ppw_gene)
+pdf("results/Figure4AB.pdf", width=6, height=3, onefile=F)
+print(ggarrange(ppw_met,ppw_gene, ncol=2, nrow=1))
 dev.off()
 
-#### Pathway Enrichment Results ----
+#### Figure 4C ----
 
 # remove metabolites with no significant results
 metlist <- res_met %>%
@@ -1168,8 +951,6 @@ annot_row <- metlist %>%
                      dplyr::select(metabolite) %>% 
                      table(dnn="metabolite") %>% as.data.frame, by="metabolite") %>%
   dplyr::rename(degree=Freq) %>%
-  # dplyr::mutate(degreeLog=log10(degree)) %>%
-  # dplyr::select(-degree) %>%
   tibble::column_to_rownames("metabolite")
 
 # create df for heatmap
@@ -1181,6 +962,7 @@ phmat <- res_met %>%
   dplyr::arrange(pathway) %>%
   tibble::column_to_rownames("pathway")
 
+# assemble pathway annotations
 annot_col <- res_met %>%
   dplyr::mutate(pw_class=ifelse(Class=="Metabolism", "Metabolism",
                                 ifelse(Group=="Immune system","Immune system", "Other"))) %>%
@@ -1201,434 +983,115 @@ ph <- phmat %>% t %>% as.data.frame %>%
            color = c("#E5E5E5","#D4A4A4","#D4A4A4","#CB8383","#C36363","#BA4242","#B22222"))
 
 # save to file
-pdf(sprintf("%s/Figure4C.pdf", Sys.Date()), width=12, height = 8)
+pdf("results/Figure4C.pdf", width=12, height = 12)
 print(ph)
 dev.off()
+
+#### Table S1 ----
+
+# write to table the significant gene-metabolite pairs
+write.table(x=res_conc %>%
+              dplyr::filter(n_dataset>n_data_cut) %>%
+              dplyr::filter(padj<pcut),
+            file="results/TableS1.txt",
+            append = FALSE, sep = " ", dec = ".",
+            row.names = TRUE, col.names = TRUE)
+
+#### Table S3 ----
 
 # save pathway annotations to file
 res_met %>%
   dplyr::select(Class,Group,ID,Name) %>% 
   distinct %>% 
-  write.xlsx2(file=sprintf("%s/TableS3.xlsx", Sys.Date()), sheetName = "KEGGpathways", 
+  write.xlsx2(file="results/TableS3.xlsx", sheetName = "KEGGpathways", 
               col.names = TRUE, row.names = F, append = FALSE)
 
-#### TvsN results ----
+#### Figure S1 ----
 
-# load RDS files
-ss_gene <- readRDS("../Data/tumor_vs_normal_gene_aggregated_summary.rds")
-ss_met <- readRDS("../Data/tumor_vs_normal_metabolite_aggregated_summary.rds")
-
-# assign names to list items
-nm <- sapply(ss_gene, function(x){x$pathway %>% unique})
-names(ss_gene) <- nm
-nm <- sapply(ss_met, function(x){x$pathway %>% unique})
-names(ss_met) <- nm
-
-# merge and clean
-dt_new <- lapply(ss_gene, function(x){
-  x %>% 
-    dplyr::select(-name, -value) %>%
-    distinct()
-}) %>% {do.call(rbind,.)} %>%
-  rbind(lapply(ss_met, function(x){
-    x %>% 
-      dplyr::select(-name, -value) %>%
-      distinct()
-  }) %>% {do.call(rbind,.)} 
-  ) 
-
-# find pathways with no metabolites or gene measured in 2 dataset or more
-pw_remove <- dt_new %>%
-  # dplyr::filter(omics=="metabolite") %>% 
-  dplyr::group_by(pathway, omics) %>% 
-  dplyr::summarise(var=sum(numOfItemsMeasured!=0)) %>% 
-  dplyr::filter(var<=5) %>%
-  dplyr::pull(pathway)
-
-dt_new %>%
-  dplyr::select(omics, pathway, dataset, numOfItemsMeasured) %>%
-  tidyr::pivot_wider(id_cols = c(omics,pathway), names_from = dataset, values_from = numOfItemsMeasured) %>% 
-  dplyr::arrange(pathway) %>% 
-  View
-
-# remove those pathways
-dt_new %<>%
-  dplyr::filter(!(pathway %in% pw_remove))
-
-# save pathway annotations to file
-dt_new %>%
-  dplyr::arrange(pathway) %>% 
-  write.xlsx2(file=sprintf("%s/TableS3.xlsx", Sys.Date()), sheetName = "Tumor_vs_Normal", 
-              col.names = TRUE, row.names = F, append = FALSE)
-
-# create score per dataset
-dt_new %<>%
-  dplyr::mutate(score_DF=ifelse(numOfItemsMeasured!=0,(numOfItemsUp+numOfItemsDown)/numOfItemsMeasured,0))
-
-# compute correlation between gene and metabolite scores per pathways
-dt_new_cor <- dt_new %>%
-  dplyr::select(-numOfTotalItemsInPathway,-numOfItemsMeasured,
-                -numOfItemsUp,-numOfItemsDown) %>%
-  tidyr::pivot_wider(names_from = "omics", values_from = "score_DF") %>% 
-  dplyr::group_by(pathway) %>%
-  dplyr::mutate(cor=cor.test(gene,metabolite, method="spearman")$estimate , 
-                p.value=cor.test(gene,metabolite, method="spearman")$p.value,
-                ci_lower=DescTools::SpearmanRho(gene,metabolite, conf.level=0.95)[2] %>% as.vector,
-                ci_upper=DescTools::SpearmanRho(gene,metabolite, conf.level=0.95)[3] %>% as.vector) %>%
-  dplyr::ungroup() %>%
-  dplyr::arrange(p.value)
-
-# add p-value adjustment
-dt_new_cor %<>%
-  dplyr::left_join(dt_new_cor %>%
-                     dplyr::select(pathway, cor, p.value, ci_lower, ci_upper) %>%
-                     distinct %>%
-                     dplyr::mutate(padj=p.adjust(p.value, method = "BH"))) %>%
-  mutate_at(vars(pathway), funs(factor(.,levels=unique(.)))) 
-
-#### Plot Results ----
-
-# plot DF score histogram per omics
-dt_new %>%
-  ggplot(aes(x=score_DF)) +
-  geom_histogram(bins=20) +
-  theme_bw() +
-  facet_wrap(~omics)
-
-# plot all pathways and datasets together
-dt_new %>%
-  dplyr::select(-numOfTotalItemsInPathway,-numOfItemsMeasured,
-                -numOfItemsUp,-numOfItemsDown) %>%
-  tidyr::pivot_wider(names_from = "omics", values_from = "score_DF") %>% 
-  ggplot(aes(x=metabolite, y=gene)) +
-  geom_point(aes(color=dataset), alpha=0.5) +
-  geom_smooth(aes(color=dataset), method=MASS::rlm, se=F, size=0.5) +
-  scale_color_manual(values=setNames(mapping_color$Color[1:7], 
-                                     nm=mapping_color$OldName[1:7])) +
-  theme_bw() +
-  ggtitle("Differential Score across datasets and pathways")
-
-# plot scores per pathway
-dt_new_cor %>%
-  ggplot(aes(x=metabolite, y=gene)) +
-  geom_point(aes(color=dataset),alpha=0.5) +
-  geom_smooth(aes(color=ifelse(padj<0.15,"significant","non significant")),method=MASS::rlm, se=F, size=0.5) +
-  scale_color_manual(values=setNames(mapping_color$Color, nm=mapping_color$OldName)) +
-  theme_bw() +
-  xlab("Metabolomics DF score") +
-  ylab("Transcriptomics DF score") +
-  facet_wrap(~pathway)
-
-# display correlations per pathway
-dt_new_cor %>%  
-  dplyr::select(pathway,cor,ci_lower,ci_upper,p.value,padj) %>%
-  distinct() %>%
-  dplyr::left_join(kegg_hierarchy, by=c("pathway"="Name")) %>%
-  dplyr::mutate(sign=ifelse(ci_lower>0 | ci_upper<0,"significant","non significant")) %>%
-  dplyr::arrange(-cor) %>%
-  mutate_at(vars(pathway), funs(factor(.,levels=unique(.)))) %>%
-  ggplot(aes(x=pathway,y=cor)) +
-  geom_point(aes(color=Group)) +
-  geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper, color=sign)) +
-  geom_hline(yintercept = 0, linetype="dashed", color="gray80") +
-  scale_color_manual(values=setNames(mapping_color$Color[8:9], nm=mapping_color$OldName[8:9])) +
-  theme_bw() +
-  coord_flip() +
-  ggtitle("Spearman correlation of gene-metabolite DF scores across datasets")
-
-#### Ed's figure ----
-
-genesum = data.frame()
-for (ii in 1:length(ss_gene)){
-  temp = ss_gene[[ii]][,c(3,5:9)]
-  temp = temp[-which(duplicated(temp)),]
-  genesum = rbind(genesum,temp)
-  
-}
-
-genesum$DF = (genesum$numOfItemsUp-genesum$numOfItemsDown)/genesum$numOfItemsMeasured
-#genesum = genesum[-which(is.na(genesum$DF)),] # no missing data
-genesum$omics = 'Transcript'
-
-# score each pathway by its mean
-pwayscore = c()
-for (ii in unique(genesum$pathway)){
-  pwayscore[ii] = mean(genesum[which(genesum$pathway == ii),'DF'])
-}
-
-metsum = data.frame()
-for (ii in 1:length(ss_gene)){
-  temp = ss_met[[ii]][,c(3,5:9)]
-  temp = temp[-which(duplicated(temp)),]
-  metsum = rbind(metsum,temp)
-}
-metsum$DF = (metsum$numOfItemsUp-metsum$numOfItemsDown)/metsum$numOfItemsMeasured
-metsum = metsum[-which(is.na(metsum$DF)),]
-metsum$omics = 'Metabolite'
-
-allsum = rbind(metsum,genesum)
-allsum$studypway = paste(allsum$dataset,allsum$pathway,sep =':')
-
-# calculate the color of the segments
-dfdiff = data.frame(matrix(NA,0,4),stringsAsFactors = FALSE)
-for (ii in unique(allsum$studypway)){
-  tempg = allsum[which(allsum$studypway == ii & allsum$omics == 'Transcript'),]
-  tempm = allsum[which(allsum$studypway == ii & allsum$omics == 'Metabolite'),]
-  dfdiff[ii,] = c(strsplit(ii,'\\:')[[1]][1],strsplit(ii,'\\:')[[1]][2],tempg[1,'DF'],tempm[1,'DF'])
-}
-colnames(dfdiff) = c('dataset','pathway','DFgene','DFmet')
-dfdiff$DFgene = as.numeric(dfdiff$DFgene)
-dfdiff$DFmet = as.numeric(dfdiff$DFmet)
-dfdiff$sign = ifelse(sign(dfdiff$DFgene) == sign(dfdiff$DFmet),1,-1)
-dfdiff$x = 'Metabolite'
-dfdiff$xend = 'Transcript'
-
-pwayscore2 = c()
-for (ii in unique(genesum$pathway)){
-  pwayscore2[ii] = sum(dfdiff[which(dfdiff$pathway == ii),'sign'],na.rm = TRUE)
-}
-
-# order the pathways 
-allsum$pathway = factor(allsum$pathway,levels = names(pwayscore2)[order(pwayscore2)])
-
-# order the pathways 
-pdf(sprintf("%s/TvsN_Dotplot.pdf", Sys.Date()),height = 8,width = 12)
-print(
-allsum %>%
-  dplyr::filter(pathway %in% (dt_new_cor %>% dplyr::pull(pathway) %>% unique)) %>% 
-  ggplot(aes(x=omics, y=pathway,color = DF)) + 
-  geom_point(aes(size=log10(numOfItemsMeasured))) + 
-  scale_size_continuous(range = c(0.1,3)) +
-  scale_x_discrete(guide = guide_axis(angle = 90)) +
-  scale_color_gradient2() +
-  theme_minimal() + 
-  theme(panel.grid.major.y = element_blank(),
-        panel.grid.minor.y = element_blank()) +
+# concordance distribution
+p_conc_distr <- res_conc %>%
+  dplyr::filter(n_dataset>7) %>%
+  dplyr::filter(padj<0.01) %>% 
+  tidyr::pivot_longer(cols = grep(colnames(res_conc), pattern="_Tumor", value = T), names_to = "dataset", values_to = "conc") %>% 
+  dplyr::filter(gene %in% c("IDO1","GDA","CD38") & metabolite %in% c("kynurenine","guanine","nicotinamide ribonucleotide (NMN)")) %>% 
+  dplyr::mutate(label=sprintf("%s_%s",gene,metabolite)) %>% 
+  dplyr::mutate(dataset=str_remove(dataset, pattern = "_Tumor") %>% factor(levels=mapping_color$NewName)) %>%
+  ggplot(aes(x=label, y=2*conc-1)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(aes(color=dataset), position = position_jitter(width = 0.2)) +
+  scale_color_manual(values = mapping_color$Color) +
+  ylab("Concordance") +
   xlab("") +
-  ylab("") +
-  geom_segment(data = dfdiff[which(dfdiff$sign == 1),],aes(x = x,xend = xend,y = pathway,yend = pathway),color = 'black',linetype = 'solid') +
-  geom_segment(data = dfdiff[which(dfdiff$sign == -1),],aes(x = x,xend = xend,y = pathway,yend = pathway),color = 'gray',linetype = 'dashed') +
-  facet_wrap(~dataset,nrow = 1) 
-)
-dev.off()
-
-genesum = data.frame()
-for (ii in 1:length(ss_gene)){
-  temp = ss_gene[[ii]][,c(3,5:9)]
-  if (any(duplicated(temp))){
-    temp = temp[-which(duplicated(temp)),]
-  }
-  genesum = rbind(genesum,temp)
-}
-
-genesum$DF = (genesum$numOfItemsUp-genesum$numOfItemsDown)/genesum$numOfItemsMeasured
-#genesum = genesum[-which(is.na(genesum$DF)),] # no missing data
-genesum$omics = 'Transcript'
-
-# score each pathway by its mean
-pwayscore = c()
-for (ii in unique(genesum$pathway)){
-  pwayscore[ii] = mean(genesum[which(genesum$pathway == ii),'DF'])
-}
-
-metsum = data.frame()
-for (ii in 1:length(ss_gene)){
-  temp = ss_met[[ii]][,c(3,5:9)]
-  if (any(duplicated(temp))){
-    temp = temp[-which(duplicated(temp)),]
-  }
-  metsum = rbind(metsum,temp)
-}
-metsum$DF = (metsum$numOfItemsUp-metsum$numOfItemsDown)/metsum$numOfItemsMeasured
-metsum = metsum[-which(is.na(metsum$DF)),]
-metsum$omics = 'Metabolite'
-
-allsum = rbind(metsum,genesum)
-allsum$studypway = paste(allsum$dataset,allsum$pathway,sep =':')
-
-# calculate the color of the segments
-dfdiff = data.frame(matrix(NA,0,4),stringsAsFactors = FALSE)
-for (ii in unique(allsum$studypway)){
-  tempg = allsum[which(allsum$studypway == ii & allsum$omics == 'Transcript'),]
-  tempm = allsum[which(allsum$studypway == ii & allsum$omics == 'Metabolite'),]
-  dfdiff[ii,] = c(strsplit(ii,'\\:')[[1]][1],strsplit(ii,'\\:')[[1]][2],tempg[1,'DF'],tempm[1,'DF'])
-}
-colnames(dfdiff) = c('dataset','pathway','DFgene','DFmet')
-dfdiff$DFgene = as.numeric(dfdiff$DFgene)
-dfdiff$DFmet = as.numeric(dfdiff$DFmet)
-dfdiff$sign = ifelse(sign(dfdiff$DFgene) == sign(dfdiff$DFmet),1,-1)
-dfdiff$x = 'Metabolite'
-dfdiff$xend = 'Transcript'
-
-pwayscore2 = c()
-for (ii in unique(genesum$pathway)){
-  pwayscore2[ii] = sum(dfdiff[which(dfdiff$pathway == ii),'sign'],na.rm = TRUE)
-}
-
-pwlist <- (dt_new_cor %>% dplyr::pull(pathway) %>% as.character %>% unique)
-
-# filter pathways
-pwayscore2 <- pwayscore2[names(pwayscore2) %in% pwlist]
-allsum %<>%
-  dplyr::filter(pathway %in% pwlist)
-
-# add score to dataframe
-allsum %<>%
-  dplyr::left_join(pwayscore2 %>% 
-                     as.data.frame %>% 
-                     dplyr::rename(score=".") %>% 
-                     tibble::rownames_to_column("pathway"),
-                   by="pathway") %>%
-  # order pathways by score
-  dplyr::arrange(score) %>%
-  dplyr::mutate(pathway=factor(pathway, levels=pathway %>% unique))
-
-
-pdf("TvsN_Dotplot.pdf",height = 8,width = 12)
-print(
-  allsum %>% 
-    ggplot(aes(x=omics, y=pathway,color = DF)) + 
-    geom_point(aes(size=log10(numOfItemsMeasured))) + 
-    scale_size_continuous(range = c(0.1,3)) +
-    scale_x_discrete(guide = guide_axis(angle = 90)) +
-    scale_color_gradient2() +
-    theme_minimal() + 
-    theme(panel.grid.major.y = element_blank(),
-          panel.grid.minor.y = element_blank()) +
-    xlab("") +
-    ylab("") +
-    geom_segment(data = dfdiff[which(dfdiff$sign == 1),],aes(x = x,xend = xend,y = pathway,yend = pathway),color = 'black',linetype = 'solid') +
-    geom_segment(data = dfdiff[which(dfdiff$sign == -1),],aes(x = x,xend = xend,y = pathway,yend = pathway),color = 'gray',linetype = 'dashed') +
-    facet_wrap(~dataset,nrow = 1) 
-)
-dev.off()
-
-save(pwlist, file=sprintf("%s/Pathwaylist.Rdata", Sys.Date()))
-
-#### Pathway Class Enrichment Analysis ----
-
-# plot only significant pathways
-dt_new_cor %>%
-  dplyr::filter(padj<0.15) %>% 
-  ggplot(aes(x=metabolite, y=gene)) +
-  geom_point(aes(color=dataset),alpha=0.5) +
-  geom_smooth(aes(color=ifelse(padj<0.15,"significant","non significant")),method=MASS::rlm, se=F, size=0.5) +
-  scale_color_manual(values=setNames(mapping_color$Color, nm=mapping_color$OldName)) +
+  ylim(c(-1,1)) +
   theme_bw() +
-  xlab("Metabolomics DF score") +
-  ylab("Transcriptomics DF score") +
-  facet_wrap(~pathway,ncol = 5)
+  theme(text=element_text(size=7), axis.text=element_text(size=7), 
+        axis.title=element_text(size=7),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        legend.position = "none")
 
-# visualize significant pathways
-dt_new_cor %>% 
-  dplyr::filter(padj<0.15) %>% 
-  dplyr::left_join(kegg_hierarchy, by=c("pathway"="Name")) %>% 
-  dplyr::select(Group, pathway, cor, p.value, padj) %>% 
-  distinct() %>% View
-dplyr::filter(Group=="Amino acid metabolism") %>% 
-  dplyr::pull(pathway) %>% View
-
-# visualize results for the two pathway classes of interest
-dt_new_cor %>% 
-  dplyr::left_join(kegg_hierarchy, by=c("pathway"="Name")) %>% 
-  dplyr::select(Group, pathway, cor, p.value, padj) %>% 
-  distinct() %>% 
-  dplyr::filter(Group %in% (dt_new_cor %>% 
-                              dplyr::filter(padj<0.05) %>% 
-                              dplyr::left_join(kegg_hierarchy, by=c("pathway"="Name")) %>%
-                              dplyr::pull(Group) %>% unique)) %>% View
-
-# visualize Group distribution across all pathways tested
-dt_new %>% 
-  dplyr::left_join(kegg_hierarchy, by=c("pathway"="Name")) %>% 
-  dplyr::select(pathway, Group) %>% 
-  distinct() %>% 
-  dplyr::select(Group) %>%
-  table
-
-# enrichment dataset
-dt_pw_enr <- dt_new_cor %>%
-  dplyr::left_join(kegg_hierarchy, by=c("pathway"="Name")) %>%
-  dplyr::select(pathway,Group,padj) %>%
-  dplyr::distinct() %>%
-  dplyr::mutate(is_sign=ifelse(padj<0.05,1,0) %>% factor(levels = c(1,0)),
-                is_aa=ifelse(Group=="Amino acid metabolism",1,0) %>% factor(levels = c(1,0)),
-                is_carb=ifelse(Group=="Carbohydrate metabolism",1,0) %>% factor(levels = c(1,0)))
-
-# Fisher's test for Amino acid metabolism
-dt_pw_enr %>%  
-  dplyr::select(is_sign,is_aa) %>% 
-  table() %>% fisher.test %>% .$p.value
-
-# Fisher's test for Carbohydrate metabolism
-dt_pw_enr %>%  
-  dplyr::select(is_sign,is_carb) %>% 
-  table() %>% fisher.test %>% .$p.value
-
-#### Paper figures ----
-
-# plot scores for selected pathways
-pw <- "Citrate cycle (TCA cycle)"
-
-pdf(sprintf("%s/TvsN_Pathway_%s.pdf", Sys.Date(), pw), width=2.5, height=2.5, onefile = F)
-print(
-  dt_new_cor %>%
-    dplyr::filter(pathway == pw) %>%
-    ggplot(aes(x=metabolite, y=gene, label=dataset)) +
-    geom_point(aes(color=dataset),alpha=0.5) +
-    geom_smooth(aes(color=ifelse(padj<0.05,"significant","non significant")),method=MASS::rlm, se=F, size=0.2) +
-    scale_color_manual(values=setNames(mapping_color$Color, nm=mapping_color$OldName)) +
-    geom_text_repel(size=2) +
-    theme_bw() +
-    xlab("Metabolomics DF score") +
-    ylab("Transcriptomics DF score") +
-    ggtitle(pw) +
-    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-          panel.background = element_blank(), axis.line = element_line(colour = "black"),
-          text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),
-          legend.position="none",
-          axis.text.y = element_text(color = "black"),
-          axis.text.x = element_text(color="black"))
-)
+# save as pdf
+pdf("results/FigureS1.pdf", width=4, height=5)
+print(p_conc_distr)
 dev.off()
 
-pdf(sprintf("%s/TvsN_Pathway_Cor.pdf", Sys.Date()), width=5, height=3, onefile = F)
-print(
-  dt_new_cor %>%  
-    dplyr::select(pathway,cor,ci_lower,ci_upper,p.value,padj) %>%
-    distinct() %>%
-    dplyr::left_join(kegg_hierarchy, by=c("pathway"="Name")) %>%
-    dplyr::mutate(sign=ifelse(ci_lower>0 | ci_upper<0,"significant","non significant")) %>%
-    dplyr::arrange(-cor) %>%
-    dplyr::mutate(label=ifelse(sign=="significant", pathway, NA)) %>% 
-    mutate_at(vars(pathway), funs(factor(.,levels=unique(.)))) %>%
-    ggplot(aes(x=pathway,y=cor, label=label)) +
-    geom_point(aes(color=Group)) +
-    geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper, color=sign)) +
-    geom_hline(yintercept = 0, linetype="dashed", color="gray60") +
-    scale_color_manual(values=setNames(mapping_color$Color[8:9], nm=mapping_color$OldName[8:9])) +
-    theme_bw() +
-    # coord_flip() +
-    geom_label_repel(box.padding = 0.5,size=2, fill="white") +
-    ggtitle("Spearman correlation of gene-metabolite DF scores across datasets") +
-    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-          panel.background = element_blank(), axis.line = element_line(colour = "black"),
-          text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),
-          legend.position="none",
-          axis.text.x = element_blank(), axis.ticks.x=element_blank(),
-          axis.text.y = element_text(color = "black"))
-)
+#### Figure S4 ----
+
+# Transcripts overlap across datasets
+p_rna <- lapply(mapping_color$NewName %>% {names(.)=.;.}, function(x){
+  # get list of metabolites per cohort
+  n_met=rna_all %>% lapply(rownames) %>% multiIntersect() %>% 
+    dplyr::select(any_of(c(paste0(x,"_Tumor"),paste0(x,"_Normal")))) %>% 
+    dplyr::mutate(n=rowSums(.)) %>% 
+    dplyr::mutate(count=ifelse(n>0,1,0)) %>% 
+    dplyr::filter(count==1) %>% 
+    rownames
+}) %>% 
+  multiIntersect %>% 
+  dplyr::mutate(ntot=rowSums(.)) %>% 
+  dplyr::select(ntot) %>% 
+  table(dnn="ntot") %>% as.data.frame %>% 
+  dplyr::mutate(ntot=as.numeric(ntot)) %>%
+  dplyr::arrange(-ntot) %>% 
+  dplyr::mutate(n_cumul = cumsum(Freq)) %>%
+  dplyr::mutate(omics="Transcriptomics") %>% 
+  ggplot(aes(x=factor(ntot), y=n_cumul, group=omics)) +
+  geom_line(color="grey60") +
+  geom_point() +
+  xlab("Number of datasets") +
+  ylab("Number of common Transcripts") +
+  ylim(c(0,45000)) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),legend.position="none")
+
+# Metabolites overlap across datasets
+p_met <- lapply(mapping_color$NewName %>% {names(.)=.;.}, function(x){
+  # get list of metabolites per cohort
+  n_met=met_all %>% lapply(rownames) %>% multiIntersect() %>% 
+    dplyr::select(any_of(c(paste0(x,"_Tumor"),paste0(x,"_Normal")))) %>% 
+    dplyr::mutate(n=rowSums(.)) %>% 
+    dplyr::mutate(count=ifelse(n>0,1,0)) %>% 
+    dplyr::filter(count==1) %>% 
+    rownames
+}) %>% 
+  multiIntersect %>%
+  dplyr::mutate(ntot=rowSums(.)) %>%
+  dplyr::select(ntot) %>% 
+  table(dnn="ntot") %>% as.data.frame %>% 
+  dplyr::mutate(ntot=as.numeric(ntot)) %>%
+  dplyr::arrange(-ntot) %>% 
+  dplyr::mutate(n_cumul = cumsum(Freq)) %>% 
+  dplyr::mutate(omics="Metabolomics") %>%
+  ggplot(aes(x=factor(ntot), y=n_cumul, group=omics)) +
+  geom_line(color="grey60") +
+  geom_point() +
+  xlab("Number of datasets") +
+  ylab("Number of common Metabolites") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        text=element_text(size=7), axis.text=element_text(size=7), axis.title=element_text(size=7),legend.position="none")
+
+# save to file
+pdf("results/FigureS4.pdf", width=7, height=3.5, onefile = F)
+print(ggarrange(p_rna,p_met, ncol=2, nrow=1))
 dev.off()
-
-# # save results to file
-# library(xlsx)
-# res <- dt_new_cor %>%  
-#   dplyr::select(pathway,cor,ci_lower,ci_upper,p.value,padj) %>%
-#   distinct() %>%
-#   dplyr::left_join(kegg_hierarchy, by=c("pathway"="Name")) %>%
-#   dplyr::arrange(-cor) %>% 
-#   dplyr::select(-match_name) %>% as.data.frame
-# write.xlsx2(x=res, file=sprintf("%s/TableS17.xlsx", Sys.Date()), sheetName = "TvsN_PathwaySpearman", 
-#            col.names = TRUE, row.names = F, append = FALSE)
-
-
