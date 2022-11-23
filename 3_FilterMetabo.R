@@ -10,26 +10,19 @@ library(maplet)
 #### Load mapping and annotation files ----
 
 # load master mapping file
-mapping_file <- read.csv2(file = "data/MasterMapping_MetImmune_03_16_2022.csv", sep=",")
+mapping_file <- read.csv2(file = "data/MasterMapping_MetImmune_03_16_2022_release.csv", sep=",")
 
 # change name of one of the ccRCC2 dataset batches for readability
-mapping_file$Dataset[mapping_file$RNAFile == "MultiRegionalRCC.tpm.gene_symbol.csv"] <- "RC18_2"
+mapping_file$Dataset[mapping_file$RNAFile == "MultiRegionalRCC.tpm.gene_symbol.csv"] <- "ccRCC3"
 
 mm <- mapping_file %>% dplyr::select(MetabFile,RNAFile,Dataset)  %>% 
   distinct() %>%
-  dplyr::arrange(Dataset) 
-
-# add cohort names
-mm %<>%
-  dplyr::left_join(data.frame(Dataset = mm$Dataset,
-                              Cohort = c("BRCA2","BRCA1","COAD","GBM","DLBCL",
-                                         "HurthleCC","HCC","ICC","OV","PDAC",
-                                         "PRAD","ccRCC1","ccRCC2","ccRCC3","ccRCC4")), 
-                   by="Dataset")
+  dplyr::arrange(Dataset) %>%
+  dplyr::mutate(Cohort=Dataset)
 
 #### Load Metabolomics Data ----
 
-filedir_data <- "data/preprocessed"
+filedir_data <- "results/preprocessed_data"
 filelist <- list.files(filedir_data) 
 filelist <- filelist %>% 
   grep(pattern = "PreprocessedData_", x = .,value = T) %>%
@@ -39,7 +32,7 @@ cohorts <- sub(".xlsx","",sub("^[^_]*_", "", filelist))
 
 # load preprocessed and imputed metabolomics data
 met <- lapply(cohorts %>% {names(.)=.;.}, function(x){
-  read.xlsx(sprintf("data/preprocessed/PreprocessedData_%s.xlsx",x), sheet = "data_imputed", rowNames = T)
+  read.xlsx(sprintf("results/preprocessed_data/PreprocessedData_%s.xlsx",x), sheet = "data_imputed", rowNames = T)
 })
 # add second entry for ccRCC2 (ie. ccRCC3) 
 # for this dataset there are two batches of RNA that should be treated separately
@@ -49,7 +42,7 @@ met <- met[sort(names(met))]
 
 # load sample annotations
 anno <- lapply(cohorts %>% {names(.)=.;.}, function(x){
-  read.xlsx(sprintf("data/preprocessed/PreprocessedData_%s.xlsx",x), sheet = "sampleanno", rowNames = T, )
+  read.xlsx(sprintf("results/preprocessed_data/PreprocessedData_%s.xlsx",x), sheet = "sampleanno", rowNames = T, )
 })
 # add second entry for ccRCC2 (ie. ccRCC3) 
 # for this dataset there are two batches of RNA that should be treated separately
@@ -147,19 +140,19 @@ names(met_all)[1:length(met_T)] <- sprintf("%s_Tumor",names(met_T))
 names(met_all)[(length(met_T)+1):length(met_all)] <- sprintf("%s_Normal",names(met_N))
 
 # create file for ccRCC3
-wb <- loadWorkbook(file="data/preprocessed/PreprocessedData_ccRCC2.xlsx")
-saveWorkbook(wb, file="data/preprocessed/PreprocessedData_ccRCC3.xlsx", overwrite = TRUE)
+wb <- loadWorkbook(file="results/preprocessed_data/PreprocessedData_ccRCC2.xlsx")
+saveWorkbook(wb, file="results/preprocessed_data/PreprocessedData_ccRCC3.xlsx", overwrite = TRUE)
 
 # add one sheet to preprocessed data files
 lapply(names(met_all), function(x){
   print(x)
   # load Excel file
-  wb <- loadWorkbook(file=sprintf("data/preprocessed/PreprocessedData_%s.xlsx",gsub(pattern = "_Tumor|_Normal", replacement = "", x)))
+  wb <- loadWorkbook(file=sprintf("results/preprocessed_data/PreprocessedData_%s.xlsx",gsub(pattern = "_Tumor|_Normal", replacement = "", x)))
   # add sheet
   sheet = addWorksheet(wb, sprintf("metabo_imputed_filtered_%s",strsplit(x, "_(?!.*_)", perl=TRUE)[[1]][2]))
   writeData(wb, sheet=sheet, met_all[[x]], rowNames = T, colNames = T)
   # save workbook
-  saveWorkbook(wb, sprintf("data/preprocessed/PreprocessedData_%s.xlsx",gsub(pattern = "_Tumor|_Normal", replacement = "", x)), overwrite = TRUE)
+  saveWorkbook(wb, sprintf("results/preprocessed_data/PreprocessedData_%s.xlsx",gsub(pattern = "_Tumor|_Normal", replacement = "", x)), overwrite = TRUE)
 }) %>% invisible
   
 #### Save Results ----

@@ -104,12 +104,12 @@ names(rna_all)[(length(rna_T)+1):length(rna_all)] <- sprintf("%s_Normal",names(r
 lapply(names(rna_all), function(x){
   print(x)
   # load Excel file
-  wb <- loadWorkbook(file=sprintf("data/preprocessed/PreprocessedData_%s.xlsx",gsub(pattern = "_Tumor|_Normal", replacement = "", x)))
+  wb <- loadWorkbook(file=sprintf("results/preprocessed_data/PreprocessedData_%s.xlsx",gsub(pattern = "_Tumor|_Normal", replacement = "", x)))
   # add sheet
   sheet = addWorksheet(wb, sprintf("rna_imputed_filtered_%s",strsplit(x, "_(?!.*_)", perl=TRUE)[[1]][2]))
   writeData(wb, sheet=sheet, rna_all[[x]], rowNames = T, colNames = T)
   # save workbook
-  saveWorkbook(wb, sprintf("data/preprocessed/PreprocessedData_%s.xlsx",gsub(pattern = "_Tumor|_Normal", replacement = "", x)), overwrite = TRUE)
+  saveWorkbook(wb, sprintf("results/preprocessed_data/PreprocessedData_%s.xlsx",gsub(pattern = "_Tumor|_Normal", replacement = "", x)), overwrite = TRUE)
 }) %>% invisible
 
 #### Save Results ----

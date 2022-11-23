@@ -41,12 +41,12 @@ lapply(names(D), function(x){
 lapply(names(D), function(x){
   print(x)
   # load Excel file
-  wb <- loadWorkbook(file=sprintf("data/preprocessed/PreprocessedData_%s.xlsx",x))
+  wb <- loadWorkbook(file=sprintf("results/preprocessed_data/PreprocessedData_%s.xlsx",x))
   # add sheet
   sheet = addWorksheet(wb, "data_imputed")
   writeData(wb, sheet=sheet, as.data.frame(assay(D[[x]])), rowNames = T, colNames = T)
   # save workbook
-  saveWorkbook(wb, sprintf("data/preprocessed/PreprocessedData_%s.xlsx",x), overwrite = TRUE)
+  saveWorkbook(wb, sprintf("results/preprocessed_data/PreprocessedData_%s.xlsx",x), overwrite = TRUE)
 }) %>% invisible
 
 #### Save Workspace to file ----

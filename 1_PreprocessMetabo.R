@@ -98,7 +98,7 @@ new_names <- read.xlsx("data/MetinfoFromData.xlsx", sheet = "Sheet2")
 metanno <- read.xlsx("data/MetinfoFromData.xlsx", sheet = "Sheet3")
 
 # load master mapping file
-mapping_file <- read.csv2(file = "data/MasterMapping_MetImmune_03_16_2022.csv", sep=",") 
+mapping_file <- read.csv2(file = "data/MasterMapping_MetImmune_03_16_2022_release.csv", sep=",") 
 
 # collect all datasets into one list
 D <- list()
@@ -352,12 +352,16 @@ sapply(names(D), function(x){
 #### Write normalized data to file ----
 
 # check if directory to save results exists, otherwise create
-if(!dir.exists("data/preprocessed")) {
-  dir.create("data/preprocessed")
+if(!dir.exists("results")) {
+  dir.create("results")
+}
+# check if directory to save results exists, otherwise create
+if(!dir.exists("results/preprocessed_data")) {
+  dir.create("results/preprocessed_data")
 }
 
 lapply(names(D), function(x){
-  writeSE2xls(D=D[[x]], name=sprintf("data/preprocessed/PreprocessedData_%s", x))
+  writeSE2xls(D=D[[x]], name=sprintf("results/preprocessed_data/PreprocessedData_%s", x))
 }) %>% invisible
 
 #### Save Workspace to file ----

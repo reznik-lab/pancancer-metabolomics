@@ -12,48 +12,6 @@ library(survival)
 
 #### Load Data ----
 
-# # check if data folder exists
-# if(!file.exists("data/pancancer-metabolomics/")){
-#   stop("Cannot find data folder to run this script.
-#        Please download data from Zenodo first (DOI: 10.5281/zenodo.7150252), save the unzipped folder into the data/ folder and try again.")
-# }
-# 
-# # list all Excel files in data/pancancer-metabolomics folder
-# filedir_data <- "data/pancancer-metabolomics/data"
-# filelist <- list.files(filedir_data) %>%
-#   grep(pattern = ".xlsx", x = .,value = T) %>%
-#   sort
-# 
-# # extract cohort names
-# cohorts <- sub(".xlsx","",sub("^[^_]*_", "", filelist))
-# 
-# # load preprocessed, imputed and filtered metabolomics data
-# met_all <- lapply(cohorts %>% {names(.)=.;.}, function(x){
-#   sheet <- readxl::excel_sheets(path = sprintf("data/%s.xlsx",x)) %>%
-#     {grep(x=., pattern="met_tumor", value=T)}
-#   read.xlsx(sprintf("data/%s.xlsx",x), sheet = sheet, rowNames = T)
-# })
-# 
-# # load preprocessed, imputed and filtered transcriptomics data
-# rna_all <- lapply(cohorts %>% {names(.)=.;.}, function(x){
-#   sheet <- readxl::excel_sheets(path = sprintf("data/%s.xlsx",x)) %>%
-#     {grep(x=., pattern="ge_tumor", value=T)}
-#   read.xlsx(sprintf("data/%s.xlsx",x), sheet = sheet, rowNames = T)
-# })
-# 
-# # change names for checks
-# met_zotero <- met_all
-# rna_zotero <- rna_all
-# remove(met_all, rna_all)
-# 
-# # reorder lists in alphabetical order
-# met_zotero <- met_zotero[sort(names(met_zotero))]
-# rna_zotero <- rna_zotero[sort(names(rna_zotero))]
-# 
-# # check dimensions
-# sapply(met_zotero, dim)
-# sapply(rna_zotero, dim)
-
 # load preprocessed and filtered data
 load("results/Workspace_3_FilterMetabo.Rdata")
 load("results/Workspace_4_FilterRNA.Rdata")
@@ -123,11 +81,11 @@ remove(rna_all, met_all, rna_scaled, met_scaled)
 
 #### Compute Concordance ----
 
-warning("The concordance calculation is computationally intense and will take several hours on a typical laptop.")
+warning("The concordance calculation is computationally intense and will take >12 hours on a typical laptop.")
 
 tic()
 # compute pairwise concordance
-res <- mclapply(gg, function(g){
+conc <- mclapply(gg[1:10], function(g){
   mclapply(rownames(met_joint), function(m){
     
     # gene values
@@ -175,7 +133,7 @@ toc()
 
 #### Compute Pvalues ----
 
-res %<>% 
+conc %<>% 
   dplyr::filter(n_dataset>=2) %>%
   dplyr::mutate(p.value=2*pnorm(-abs(zscore))) %>% 
   dplyr::mutate(padj=p.adjust(p.value, method="BH")) %>%
@@ -184,10 +142,10 @@ res %<>%
 #### Add distance ----
 
 # load precalculated distance 
-load("precalculated_results/distance.Rdata")
+load("data_for_scripts/Concordance/distance.Rdata")
 
 # merge pathway distance with concordance results
-res %<>%
+conc %<>%
   dplyr::left_join(d_GEM_long, by=c("gene","metabolite"="name")) %>%
   dplyr::rename(distance=dist_GEM_min) %>%
   # reorder columns for better readability
@@ -197,4 +155,4 @@ res %<>%
 
 #### Save Results ----
 
-save(res, file="results/Workspace_5_ConcordanceMetaAnalysis.Rdata")
+save(conc, file="results/Workspace_5_ConcordanceMetaAnalysis.Rdata")
