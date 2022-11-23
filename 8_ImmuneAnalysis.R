@@ -259,13 +259,13 @@ tme_zscored_t_tumors <- tme_zscored_t[tumors] #running analysis only on tumor sa
 joint_metabolite_df_t <- lapply(met_data_tumors, function(y){
   y %>% tibble::rownames_to_column("metabolite")
 }) %>%
-  reduce(full_join, by="metabolite") %>%
+  purrr::reduce(full_join, by="metabolite") %>%
   tibble::column_to_rownames("metabolite")
 
 joint_imm_sig_df_t <- lapply(tme_zscored_t_tumors, function(y){
   y %>% tibble::rownames_to_column("imm_sig")
 }) %>%
-  reduce(full_join, by="imm_sig") %>%
+  purrr::reduce(full_join, by="imm_sig") %>%
   tibble::column_to_rownames("imm_sig")
 
 # Sample size of all cohorts
