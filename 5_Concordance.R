@@ -85,7 +85,6 @@ remove(rna_all, met_all, rna_scaled, met_scaled)
 
 warning("The concordance calculation is computationally intense and will take >12 hours on a typical laptop.")
 
-tic()
 # compute pairwise concordance
 conc <- mclapply(gg[1:10], function(g){
   mclapply(rownames(met_joint), function(m){
@@ -105,7 +104,7 @@ conc <- mclapply(gg[1:10], function(g){
     conc <- survival::concordance(y_full ~ x_full + strata(z_full), keepstrata = T, weights=w_full)
     
     # extract concordance values for each dataset
-    if (class(conc$count)!="numeric"){
+    if (!("numeric" %in% class(conc$count))){
       individual_conc <- conc$count %>% {.[,1]/rowSums(.[,1:3])} %>% data.frame %>% t %>% data.frame
       colnames(individual_conc) <- df$dataset[df$tissue=="Tumor"][z_full %>% unique]
     } else {
@@ -130,8 +129,7 @@ conc <- mclapply(gg[1:10], function(g){
       cbind(X)
     
   }, mc.cores = 1) %>% {do.call(rbind,.)}
-}, mc.cores = 4) %>% {do.call(rbind,.)}
-toc()
+}, mc.cores = detectCores(logical = FALSE)-1) %>% {do.call(rbind,.)}
 
 #### Compute Pvalues ----
 

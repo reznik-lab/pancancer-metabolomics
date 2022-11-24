@@ -96,5 +96,6 @@ res_met <- lapply(met_sign %>% {names(.)=.;.}, function(y){
   dplyr::mutate(padj=p.adjust(p.value, method = "BH")) %>%
   dplyr::mutate(score=-log10(padj))
 
-# save results to file
+#### Save Results ----
+
 save(res_met, file="results/Workspace_6_ConcordancePathwayEnrichmentAnalysis.Rdata")
