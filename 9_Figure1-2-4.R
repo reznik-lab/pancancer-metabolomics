@@ -6,9 +6,11 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 rm(list = ls())
 
 library(readxl)
+library(dplyr)
 library(tidyverse)
 library(magrittr)
 library(purrr)
+library(ggplot2)
 library(ggrepel)
 library(ggpubr)
 library(ggforce)
@@ -127,8 +129,8 @@ PieDonut_edited <- function (data, mapping, start = getOption("PieDonut.start",
         df3[[1]] = factor(df3[[1]])
       if (!is.factor(df3[[2]])) 
         df3[[2]] = factor(df3[[2]])
-      df3 <- df3 %>% arrange(.data$pie, .data$donut)
-      a <- df3 %>% spread(.data$pie, value = .data$Freq)
+      df3 <- df3 %>% dplyr::arrange(.data$pie, .data$donut)
+      a <- df3 %>% tidyr::spread(.data$pie, value = .data$Freq)
       a = as.data.frame(a)
       a
       rownames(a) = a[[1]]
@@ -562,7 +564,7 @@ print(
                               str_remove(string=key,pattern = "_Tumor"),
                               str_remove(string=key,pattern = "_Normal"))) %>%
   dplyr::left_join(mapping_color, by=c("cohort"="NewName")) %>% 
-  PieDonut_edited(aes(cohort,tissue,count=value),
+  PieDonut_edited(aes(x=cohort,y=tissue,count=value),
            r0=0.3,showPieName=FALSE,showRatioThreshold = F,
            explodeDonut = F, selected=c(1:15),
            explodePie = F, explode = c(1:15), explodePos = 0.3,
