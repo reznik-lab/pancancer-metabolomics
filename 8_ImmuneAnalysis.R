@@ -707,11 +707,6 @@ histamine_concordance <- tumor_concordance[tumor_concordance$immune_signature=="
 histamine_concordance <- melt(histamine_concordance)
 histamine_concordance$pair <- c("Histamine-Mast Cells")
 
-
 #### Save data to file ----
 
-save.image("Workspace_8_ImmuneAnalysis.Rdata")
-
-
-
-
+save.image("results/Workspace_8_ImmuneAnalysis.Rdata")
