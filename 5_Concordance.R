@@ -2,6 +2,8 @@
 
 # set working directory to source file location
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+# clear workspace
+rm(list = ls())
 
 library(readxl)
 library(tidyverse)
