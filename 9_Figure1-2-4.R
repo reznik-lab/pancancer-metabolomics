@@ -484,10 +484,10 @@ moveme <- function (invec, movecommand) {
 mapping_file <- read.csv2(file = "data/MasterMapping_MetImmune_03_16_2022_release.csv", sep=",") 
 
 # load preprocessed data
-if(!file.exist("results/Workspace_3_FilterMetabo.Rdata")){
+if(!file.exists("results/Workspace_3_FilterMetabo.Rdata")){
   stop("Cannot find file Workspace_3_FilterMetabo.Rdata in results/. Please run scripts 1-4 first, and then try again. ")
 }
-if(!file.exist("results/Workspace_4_FilterRNA.Rdata")){
+if(!file.exists("results/Workspace_4_FilterRNA.Rdata")){
   stop("Cannot find file Workspace_4_FilterRNA.Rdata in results/. Please run scripts 1-4 first, and then try again. ")
 }
 load("results/Workspace_3_FilterMetabo.Rdata")
