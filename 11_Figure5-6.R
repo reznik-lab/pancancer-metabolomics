@@ -20,9 +20,9 @@ if(file.exists("results/Workspace_8_ImmuneAnalysis.Rdata")){
   load("data_for_scripts/ImmuneDeconvolution/ImmuneAnalysis.Rdata")
 }
 
-#### Figure 5 ----
+#### Figure 5A ----
 
-#Panel a; left barplot
+# Panel a; left barplot
 fig5a1 <- ggplot(immunescore_percentage_sig, aes(x = cancer, y = percent, fill = n_samples)) + geom_bar(stat="identity") + 
   ylab("Percentage of Significant Metabolites") + xlab("") +
   theme_classic() + theme(legend.position = "bottom") +
@@ -35,7 +35,7 @@ fig5a1 <- ggplot(immunescore_percentage_sig, aes(x = cancer, y = percent, fill =
         axis.text.y=element_text(colour="black"),
         axis.ticks=element_line(colour="black"))
 
-#Panel a; middle boxplots
+# Panel a; middle boxplots
 fig5a2 <- ggplot(is_expression, aes(x=expression, y=dataset)) + geom_boxplot(lwd=0.25,outlier.size = 0.1) + theme_classic() +
   theme(axis.text = element_text(size = 7),
         axis.title.x = element_text(size=7),
@@ -46,7 +46,7 @@ fig5a2 <- ggplot(is_expression, aes(x=expression, y=dataset)) + geom_boxplot(lwd
         axis.ticks=element_line(colour="black")) +
   ylab("")
 
-#Panel a; right scatterplot
+# Panel a; right scatterplot
 imp_metabolites <- c("quinolinate","kynurenine","nicotinamide ribonucleotide (NMN)",
                      "cholate","creatinine","pyruvate","citrate") #metabolites we want to label in the plot
 imp_metabolites <- c(imp_metabolites, HCC_metabolites, ICC_metabolites)
@@ -74,19 +74,20 @@ fig5a3 <- ggplot(immunescore_concordance_values, aes(x=concordance,y=dataset)) +
         legend.text = element_text(size=7), #change legend text font size
         legend.position="bottom")
 
-#Put panel a together using patchwork
+# Put panel a together using patchwork
 fig5a <- (fig5a1|fig5a2|fig5a3) + plot_layout(widths = c(1, 0.45, 2.5))
 ggsave("results/Figure5A.pdf", fig5a, height = 4, width = 6)
 
+#### Figure 5B ----
 
-#Panel b
-#Plot each HCC and ICC sample's ImmuneScore expression
+# Panel b
+# Plot each HCC and ICC sample's ImmuneScore expression
 HCC_hm <- ggplot(HCC_IS, aes(x=sample, y=sig, fill = IS)) + geom_tile() + scale_fill_gradient(low = "white",high = "red") + theme_classic() +
   xlab("") + ylab("") + theme(axis.text.x=element_blank(),axis.text.y = element_blank(),legend.position="none")
 ICC_is_hm <- ggplot(ICC_IS, aes(x=sample, y=sig, fill = IS)) + geom_tile() + scale_fill_gradient(low = "white",high = "red") + theme_classic() +
   xlab("") + ylab("") + theme(axis.text.x=element_blank(),axis.text.y = element_blank(),legend.position="none")
 
-#Plot metabolite abundance of each sample
+# Plot metabolite abundance of each sample
 HCCis_mat <- ggplot(HCC_matrix_melt,aes(x=variable,y=metabolite,fill=as.numeric(value))) + geom_tile() + 
   scale_fill_gradient2(low = "blue",mid="white",high = "red", midpoint = 0) +
   theme_classic() + xlab("") + ylab("") + theme(axis.text.x=element_blank(),axis.text.y = element_blank(), legend.position = "bottom")
@@ -94,16 +95,18 @@ ICCis_mat <- ggplot(ICC_matrix_melt,aes(x=variable,y=metabolite,fill=as.numeric(
   scale_fill_gradient2(low = "blue",mid="white",high = "red", midpoint = 0) + 
   theme_classic() + xlab("") + ylab("") + theme(axis.text.x=element_blank(),axis.text.y = element_blank(), legend.position = "bottom") 
 
-#Put together panel using patchwork
+# Put together panel using patchwork
 fig5b <- (HCC_hm|ICC_is_hm)/(HCCis_mat|ICCis_mat)
 ggsave("results/Figure5B.pdf", fig5b, height = 4, width = 6)
 
+#### Figure 5C ----
 
-#Panel c
+# Panel c
 fig5c <- ggplot(immunescore_concordance[1:23,], aes(x = -log10(p.adj), y = metabolite)) + geom_bar(stat="identity") + theme_classic() +
   xlab("-Log10 FDR-Corrected P-Value") + ylab("") + ggtitle("ImmuneScore Concordance")
 ggsave("results/Figure5C.pdf", fig5c, height = 3.5, width = 6)
 
+#### Figure 5D ----
 
 #Panel d
 fig5d1 <- ggplot(quinolinate_is_exp, aes(x=Quinolinate, y=ImmuneScore, color = CancerType)) + geom_smooth(method=lm, se=FALSE, fullrange=TRUE,size=0.5) + 
@@ -118,6 +121,7 @@ fig5d2 <- ggplot(nmn_is_exp, aes(x=NMN, y=ImmuneScore, color = CancerType)) + ge
 fig5d <- ggarrange(fig5d1,fig5d2, nrow=2, ncol=1, common.legend = T)
 ggsave("results/Figure5D.pdf", fig5d, width = 4, height = 8, units = "in")
 
+#### Figure 5E ----
 
 #Panel e
 fig5e <- ggplot(is_pathway_analysis, aes(x=-log10(p.adj), y=pathway)) + 
@@ -125,6 +129,7 @@ fig5e <- ggplot(is_pathway_analysis, aes(x=-log10(p.adj), y=pathway)) +
   ggtitle("ImmuneScore")  + geom_vline(xintercept = -log10(0.05), color = "red", linetype ="dashed")
 ggsave("results/Figure5E.pdf", fig5e, width = 5, height = 3.65, units = "in")
 
+#### Figure 5F ----
 
 #Panel f
 #Flow-sorted data boxplots
@@ -138,8 +143,7 @@ fig5f2 <- ggplot(ov_nad, aes(x=NAD,y=ImmuneScore)) + geom_point(size=0.5) + geom
 fig5f <- fig5f1/fig5f2
 ggsave("results/Figure5F.pdf", fig5f, width = 2.55, height = 3.85, units = "in")
 
-
-#### Figure 6 ----
+#### Figure 6A ----
 
 #Panel a
 fig6a1 <- ggplot(bindea_concordance, aes(x=concordance,y=-log10(p.adj))) + geom_point(aes(color = color), size = 1) + 
@@ -150,17 +154,23 @@ fig6a2 <- ggplot(bindea_concordance,aes(x=concordance,y=col2)) + geom_point(shap
   theme_classic() + ylab("") + xlab("") + theme(axis.ticks = element_blank(),axis.text = element_blank()) + xlim(-0.35,0.35)
 ggsave("results/Figure6A.pdf", ggarrange(fig6a1,fig6a2,nrow=2, heights = c(5,1)), width = 3, height = 4, units = "in")
 
+#### Figure 6B ----
+
 #Panel b
 fig6b <- ggplot(bindea_concordance_dots, aes(x=immune_signature,y=-log10(p.adj))) + geom_point(aes(color = color), size = 0.55) + 
   scale_color_manual(values= c("#D9D9D9","#FBB4AE")) + theme_classic() + theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.position="none") + 
   xlab("") + ylab("-Log10 Adjusted P-Value")
 ggsave("results/Figure6B.pdf", fig6b, height = 3.5, width = 2.75)
 
+#### Figure 6C ----
+
 #Panel c
 fig6c <- ggplot(histamine_mc_exp, aes(x=Histamine, y=Mast.Cells, color = CancerType)) + geom_smooth(method=lm, se=FALSE, fullrange=TRUE) + 
   theme_classic() + xlab("Histamine") + ylab("Mast Cells") + geom_point(size=0.2) +
   scale_color_manual(values=mapping_color$Color[match(sort(unique(histamine_mc_exp$CancerType)),mapping_color$Name)])
 ggsave("results/Figure6C.pdf", ggarrange(fig6c, common.legend = T), width = 4, height = 4, units = "in")
+
+#### Figure 6D ----
 
 #Panel d
 fig6d <- ggplot(mastcell_concordance[1:21,], aes(x = -log10(p.adj), y = metabolite)) + 
@@ -169,11 +179,15 @@ fig6d <- ggplot(mastcell_concordance[1:21,], aes(x = -log10(p.adj), y = metaboli
   geom_vline(xintercept = -log10(0.05), color = "red", linetype ="dashed")
 ggsave("results/Figure6D.pdf", fig6d, height = 2.5, width = 5)
 
+#### Figure 6E ----
+
 #Panel e
 fig6e <- ggplot(histamine_hdc_exp, aes(x=Histamine, y=HDC, color = CancerType)) + geom_smooth(method=lm, se=FALSE, fullrange=TRUE) + 
   theme_classic() + xlab("Histamine") + ylab("HDC") + geom_point(size=0.2) +
   scale_color_manual(values=mapping_color$Color[match(sort(unique(histamine_hdc_exp$CancerType)),mapping_color$Name)])
 ggsave("results/Figure6E.pdf", ggarrange(fig6e, common.legend = T), width = 4, height = 4, units = "in")
+
+#### Figure 6F ----
 
 #Panel f
 fig6f <- ggplot(adc_kyn_exp, aes(x=Kynurenine, y=aDC, color = CancerType)) + geom_smooth(method=lm, se=FALSE, fullrange=TRUE) + 

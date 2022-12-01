@@ -20,7 +20,7 @@ library(ggrepel)
 library(reshape2)
 library(patchwork)
 
-#### Load and clean data ----
+#### Load and Clean Metabolomics Data ----
 
 #Load master mapping spreadsheet
 master_mapping <- read.csv("data/MasterMapping_MetImmune_03_16_2022_release.csv")
@@ -55,6 +55,8 @@ sum(sapply(1:23,function(i){ncol(met_data[[i]])}))
 
 # Load metabolite information
 metabolite_mapping = as.data.frame(read_excel('data/MetinfoFromData.xlsx', sheet = 2))
+
+#### Load and Clean TME Data ----
 
 # Load TME data
 tme_fs = list.files(path='data/TME_deconvolution_processed', full.names = TRUE)
@@ -109,6 +111,8 @@ for (i in 1:23) {
   tme_data[[i]] <- tme_data[[i]][,imp_signatures] 
 }
 
+#### Load and Clean Transcriptomics Data ----
+
 # Load RNA data (only need datasets that measured histamine, GBM and OV don't have histamine measured)
 rna_fs = list.files(path='data/transcriptomics_processed', full.names = TRUE)
 rna_data = lapply(rna_fs, function(x) read.csv(file=x,row.names = 1, check.names = FALSE))
@@ -137,6 +141,8 @@ rna_data <- rna_data[-c(1:23)]
 # order alphabetically
 rna_data <- rna_data[order(names(rna_data))]
 
+#### Load aDC s Signature without IDO1 ----
+
 # Load aDC signature without IDO1
 adc_fs = list.files(path='data/Metabolism_Immune.aDC_exIDO1', full.names = TRUE)
 adc_data = lapply(adc_fs, function(x) read.csv(file=x,row.names = 1, check.names = FALSE))
@@ -146,6 +152,47 @@ rownames(adc_data$Project_08402_M.aDC_exIDO1.csv) <- gsub("\\.","-",rownames(adc
 adc_data <- adc_data[-6]
 
 adc_data_sub <- adc_data
+
+#### Load Kilgour Data ----
+
+# Load flow-sorted ovarian data from Kilgour et al. 2021
+kilgour_data_raw <- read.csv("data/flow_sorted_ovarian_metabolomics/Kilgour_2021_Raw_Data.csv")
+rownames(kilgour_data_raw) <- kilgour_data_raw[,1]
+kilgour_data_raw <- kilgour_data_raw[,-1]
+
+# Clean flow-sorted ovarian data
+# Probabilistic Quotient Normalization of the raw data
+normalizationPQN<-function(dat,group="all",refGroupName){
+  # row: metabolite
+  # column: sample
+  
+  # step 1: 
+  # get a reference sample aboundance by each metabolite median across cohort
+  # for each row (metabolite), calculate median number
+  if(group =="all"){
+    refSampleVector<-apply(dat,1,function(y) {median(y, na.rm=TRUE)})
+  }else{
+    subsetDat<-dat[,colnames(dat) %in% refGroupName]
+    refSampleVector<-apply(subsetDat,1,function(y) {median(y, na.rm=TRUE)})
+  }
+  # step2: compute quotients
+  quotientMatrix<-apply(dat,2, function(y){y/refSampleVector})
+  # step3: compute quotients median
+  dilutionFactor<-apply(quotientMatrix,2,function(y){median(y, na.rm=TRUE)})
+  # step4: normalize data
+  newDat<-apply(dat,1,function(y){y/dilutionFactor})
+  newDat<-t(newDat)
+  
+  return(newDat)
+  
+}
+
+# apply PQN to data
+kilgour_data_pqn <- normalizationPQN(kilgour_data_raw)
+# log transform
+kilgour_data <- log2(kilgour_data_pqn) 
+
+#### Subset Data ----
 
 # select samples that have RNA, TME and metabolomics data
 for(i in 1:13){
@@ -184,66 +231,9 @@ adc_data_sub <- adc_data_sub[order(names(adc_data_sub))]
 for(i in 1:15){
   adc_data_sub[[i]] <- scale(adc_data_sub[[i]])
 }
+#### Run Concordance Analysis on all Signatures ----
 
-# Load flow-sorted ovarian data from Kilgour et al. 2021
-kilgour_data_raw <- read.csv("data/flow_sorted_ovarian_metabolomics/Kilgour_2021_Raw_Data.csv")
-rownames(kilgour_data_raw) <- kilgour_data_raw[,1]
-kilgour_data_raw <- kilgour_data_raw[,-1]
-
-# Clean flow-sorted ovarian data
-# Probabilistic Quotient Normalization of the raw data
-normalizationPQN<-function(dat,group="all",refGroupName){
-  # row: metabolite
-  # column: sample
-  
-  # step 1: 
-  # get a reference sample aboundance by each metabolite median across cohort
-  # for each row (metabolite), calculate median number
-  if(group =="all"){
-    refSampleVector<-apply(dat,1,function(y) {median(y, na.rm=TRUE)})
-  }else{
-    subsetDat<-dat[,colnames(dat) %in% refGroupName]
-    refSampleVector<-apply(subsetDat,1,function(y) {median(y, na.rm=TRUE)})
-  }
-  
-  # step2:
-  # 
-  quotientMatrix<-apply(dat,2, function(y){y/refSampleVector})
-  
-  
-  # step3:
-  #
-  dilutionFactor<-apply(quotientMatrix,2,function(y){median(y, na.rm=TRUE)})
-  
-  
-  # step4:
-  # normalization
-  
-  newDat<-apply(dat,1,function(y){y/dilutionFactor})
-  newDat<-t(newDat)
-  
-  return(newDat)
-  
-}
-
-
-kilgour_data_pqn <- normalizationPQN(kilgour_data_raw)
-kilgour_data <- log2(kilgour_data_pqn) #log2 normalize data 
-
-#Colors for legends
-mapping_color <- data.frame(Name = c("BRCA1","BRCA2","COAD","GBM","DLBCL",
-                                     "HurthleCC","HCC","ICC","OV","PDAC",
-                                     "PRAD","ccRCC1","ccRCC2","ccRCC3","ccRCC4")) %>%
-  dplyr::arrange(Name) %>%
-  dplyr::mutate(Color = c("#e5b6a5","#c3c1a4","#e5e3c0","#bbe1b9","#88beab",
-                          "#97b1ab","#abc5bf","#abe7e1","#c6e6e7","#8fcde1",
-                          "#88aee1","#a6b7d3","#d2d5ed","#c8b7de","#e6bbcc"))
-
-
-
-
-#### Run concordance analysis ----
-#Z-Score signatures
+# compute z-score
 tme_zscored <- lapply(1:23,function(i){apply(tme_data[[i]],2,scale)}) #Z-score
 tme_zscored_t <- lapply(1:23,function(i){t(tme_zscored[[i]])}) #transpose so it's in the same format as the metabolomics data
 tme_zscored_t <- lapply(1:23,function(i){as.data.frame(tme_zscored_t[[i]])})
@@ -252,12 +242,12 @@ for(i in 1:23){
   colnames(tme_zscored_t[[i]]) <- rownames(tme_data[[i]]) #add column names back
 }
 
-#Extract tumor samples
+# Extract tumor samples
 tumors <- which(str_detect(names(tme_data),"Tumor")) #which datasets are tumor datasets
 met_data_tumors <- met_data[tumors] #running analysis only on tumor samples
 tme_zscored_t_tumors <- tme_zscored_t[tumors] #running analysis only on tumor samples
 
-#Build matricies for concordance analysis
+# Build matrices for concordance analysis
 joint_metabolite_df_t <- lapply(met_data_tumors, function(y){
   y %>% tibble::rownames_to_column("metabolite")
 }) %>%
@@ -273,18 +263,19 @@ joint_imm_sig_df_t <- lapply(tme_zscored_t_tumors, function(y){
 # Sample size of all cohorts
 ns_t <- sapply(1:15,function(i){ncol(met_data_tumors[[i]])})
 nsum_t <- cumsum(ns_t)
-#Vector with dataset id for each sample in the joint dataframe
+# Vector with dataset id for each sample in the joint dataframe
 dataset_id_t <- lapply(seq(ns_t), function(i) rep(i, ns_t[i])) %>% unlist
-#Weight vector for each sample in the joint dataframe
+# Weight vector for each sample in the joint dataframe
 weights_t <- lapply(seq(ns_t), function(i) rep(1/ns_t[i], ns_t[i])) %>% unlist
 
-#Concordance meta-analysis (all datasets)
+# Concordance meta-analysis (all datasets)
 ns_t <- sapply(1:15,function(i){ncol(met_data_tumors[[i]])})
 # vector with dataset id for each sample in the joint dataframe
 dataset_id_t <- lapply(seq(ns_t), function(i) rep(i, ns_t[i])) %>% unlist
 # weight vector for each sample in the joint dataframe
 weights_t <- lapply(seq(ns_t), function(i) rep(1/ns_t[i], ns_t[i])) %>% unlist
 
+# run concordance analysis
 tumor_concordance <- mclapply(rownames(joint_metabolite_df_t)[1:2359], function(m){
   mclapply(rownames(joint_imm_sig_df_t)[1:24], function(g){ 
     
@@ -304,7 +295,7 @@ tumor_concordance <- mclapply(rownames(joint_metabolite_df_t)[1:2359], function(
     conc <- survival::concordance(met_full ~ imm_sig_full + strata(dataset_id_full), keepstrata = T, weights=weights_full)
     
     # extract concordance of each dataset
-    if (class(conc$count)!="numeric"){
+    if (!("numeric" %in% class(conc$count))){
       individual_conc <- conc$count %>% {.[,1]/rowSums(.[,1:3])} %>% data.frame %>% t %>% data.frame
       colnames(individual_conc) <- names(met_data_tumors)[unique(dataset_id_full)]
     } else {
@@ -313,11 +304,12 @@ tumor_concordance <- mclapply(rownames(joint_metabolite_df_t)[1:2359], function(
       colnames(individual_conc) <- names(met_data_tumors)[unique(dataset_id_full)]
     }
     
+    # arrange dataframe
     X <- setNames(data.frame(matrix(ncol = 15, nrow = 0)),
                   names(met_data_tumors)) %>%
       dplyr::full_join(individual_conc, by=colnames(individual_conc))
     
-    # summarize results
+    # create result entry
     data.frame(metabolite = m,
                immune_signature = g,
                # number of datasets the metabolite was measured in
@@ -335,20 +327,23 @@ tumor_concordance <- mclapply(rownames(joint_metabolite_df_t)[1:2359], function(
   # combine all results
   {do.call(rbind,.)} 
 
+# add metabolite-signature label
 tumor_concordance$pair <- paste(tumor_concordance$metabolite,tumor_concordance$immune_signature, sep = "-")
-tumor_concordance[,c(4,8:22)] <- (2*tumor_concordance[,c(4,8:22)])-1 #scale concordance between -1 and 1
+# scale concordance between -1 and 1
+tumor_concordance[,c(4,8:22)] <- (2*tumor_concordance[,c(4,8:22)])-1 
 
-#change names of columns to remove the "_Tumor"
+# change names of columns to remove the "_Tumor"
 concordance_old_names <- colnames(tumor_concordance)[8:22]
 concordance_new_names <- word(concordance_old_names,1,sep = "\\_Tumor")
 colnames(tumor_concordance)[8:22] <- concordance_new_names
 
+#### Run Concordance Analysis on ImmuneScore ----
 
-#Immune Score concordance analysis, with p-values for each dataset
-####only for metabolites in 8+ datasets for immune score
-metabolites_8 <- unique(tumor_concordance[tumor_concordance$n_dataset >7,1]) #only include metabolites measured in 8+ datasets
+# Immune Score concordance analysis, with p-values for each dataset
+# select metabolites measured in more than 7 datasets
+metabolites_8 <- unique(tumor_concordance[tumor_concordance$n_dataset>7,1])
 
-#This function returns p-values
+# compute concordance between this subset of metabolites and ImmuneScore
 concordance_by_type8_is <- function(columns){
   res_T_tumors <- mclapply(metabolites_8, function(m){
     mclapply(rownames(joint_imm_sig_df_t)[1], function(g){ #1 because ImmuneScore is the first signature in the dataframe
@@ -373,7 +368,7 @@ concordance_by_type8_is <- function(columns){
     })})
 }
 
-#Calculate p-values for each dataset
+# Calculate p-values for each dataset
 BRCA2_columns <- match(colnames(met_data$BRCA2_Tumor),colnames(joint_metabolite_df_t))
 BRCA2_concordance8 <- unlist(concordance_by_type8_is(BRCA2_columns))
 
@@ -419,7 +414,7 @@ ccRCC3_concordance8 <- unlist(concordance_by_type8_is(ccRCC3_columns))
 ccRCC4_columns <- match(colnames(met_data$ccRCC4_Tumor),colnames(joint_metabolite_df_t))
 ccRCC4_concordance8 <- unlist(concordance_by_type8_is(ccRCC4_columns)) 
 
-#Create a dataframe with adjusted p-values
+# Create a dataframe with adjusted p-values
 immunescore_qvalues <- data.frame(BRCA1 = p.adjust(BRCA1_concordance8,method = "BH"),
                                   BRCA2 = p.adjust(BRCA2_concordance8,method = "BH"),
                                   COAD = p.adjust(COAD_concordance8,method = "BH"),
@@ -440,8 +435,9 @@ immunescore_qvalues$metabolite = metabolites_8
 immunescore_qvalues$immune_signature = rep("ImmuneScore", times = 276)
 immunescore_qvalues$pair <- paste(immunescore_qvalues$metabolite, immunescore_qvalues$immune_signature, sep = "-")
 
+#### Concordance between Kynurenine and aDC signature ----
 
-#Calculate concordance between kynurenine and aDC signature (without IDO1)
+# Calculate concordance between kynurenine and aDC signature (without IDO1)
 # sample size of all cohorts
 ns_t <- sapply(1:15,function(i){ncol(met_data_tumors[[i]])})
 nsum_t <- cumsum(ns_t)
@@ -466,11 +462,21 @@ adc_kyn_concordance <- adc_kyn_conc$concordance #0.5865804
 adc_kyn_concordance_scaled <- (2*adc_kyn_concordance)-1 #0.1731607
 adc_kyn_pvalue <- tryCatch(2*pnorm(-abs(abs(adc_kyn_conc$concordance - 0.5)/sqrt(adc_kyn_conc$var))),error = function(e) return(NA)) #2.332743e-06
 
+#### Plotting colors ----
 
+# Colors for legends
+mapping_color <- data.frame(Name = c("BRCA1","BRCA2","COAD","GBM","DLBCL",
+                                     "HurthleCC","HCC","ICC","OV","PDAC",
+                                     "PRAD","ccRCC1","ccRCC2","ccRCC3","ccRCC4")) %>%
+  dplyr::arrange(Name) %>%
+  dplyr::mutate(Color = c("#e5b6a5","#c3c1a4","#e5e3c0","#bbe1b9","#88beab",
+                          "#97b1ab","#abc5bf","#abe7e1","#c6e6e7","#8fcde1",
+                          "#88aee1","#a6b7d3","#d2d5ed","#c8b7de","#e6bbcc"))
 
-#### Run analysis for Immune Score analysis ----
-#Panel a
-#Calculate the percentage of metabolites significantly associated with Immune Score in each dataset
+#### Prepare plotting data for Immune Score Figure ----
+
+# Panel a
+# Calculate the percentage of metabolites significantly associated with Immune Score in each dataset
 immunescore_percentage_sig <- sapply(1:15,function(i){length(which(subset(immunescore_qvalues,immune_signature =="ImmuneScore")[,i] < 0.05))/
     length(which(!is.na(subset(immunescore_qvalues,immune_signature =="ImmuneScore"))[,i]))})
 immunescore_percentage_sig <- data.frame(cancer = colnames(immunescore_qvalues)[1:15],
@@ -479,7 +485,7 @@ immunescore_percentage_sig$n_samples <- sapply(1:15,function(i){ncol((met_data)[
 immunescore_percentage_sig$cancer <- factor(immunescore_percentage_sig$cancer, 
                                             levels = immunescore_percentage_sig[order(immunescore_percentage_sig$percent),1])
 
-#Immune Score expression by dataset
+# Immune Score expression by dataset
 n_tumors <- sapply(1:15,function(i){nrow(tme_data[[tumors[i]]])}) #sample size for each tumor dataset
 tumor_names <- sub("_Tumor", "", names(tme_data)[tumors])  
 is_level <- unlist(sapply(1:15,function(i){tme_data[[tumors[i]]][,"ImmuneScore"]})) #ImmuneScore expression of every sample
@@ -488,36 +494,35 @@ is_expression <- data.frame(dataset = rep(tumor_names,times=n_tumors),
                             expression = is_level)
 is_expression$dataset <- factor(is_expression$dataset, levels = levels(immunescore_percentage_sig$cancer)) #same dataset order as barplot in panel a
 
-#Table of concordance of every metabolite in every dataset with p-values
-#only metabolites in 8+ datasets
+# Table of concordance of every metabolite in every dataset with p-values
+# only metabolites in 8+ datasets
 immunescore_concordance_subset <- subset(tumor_concordance,immune_signature == "ImmuneScore" & n_dataset > 7)[,c(1,8:22)]
 immunescore_concordance_values <- melt(immunescore_concordance_subset) #melt so it can be used in ggplot
 
-#Melt the corrected p-values so it can be added to the concordance dataframe
+# Melt the corrected p-values so it can be added to the concordance dataframe
 immunescore_qvalues_melt <- melt(immunescore_qvalues[,1:15]) 
 
 colnames(immunescore_concordance_values) <- c("metabolite","dataset","concordance")
 immunescore_concordance_values$dataset <- as.factor(immunescore_concordance_values$dataset)
-#reorder dataset levels to be the same as in previous panel a plots
+# reorder dataset levels to be the same as in previous panel a plots
 immunescore_concordance_values$dataset <- factor(immunescore_concordance_values$dataset, levels = levels(immunescore_percentage_sig$cancer)) 
 immunescore_concordance_values$q_value <- immunescore_qvalues_melt$value #add adjusted p-values
-#if the concordance is not significant, set to 0
+# if the concordance is not significant, set to 0
 immunescore_concordance_values$concordance_new <- ifelse(immunescore_concordance_values$q_value < 0.05, immunescore_concordance_values$concordance,0) 
 
-#Compare median Immune Score expression to the percentage of significantly associated metabolites
+# Compare median Immune Score expression to the percentage of significantly associated metabolites
 is_median <- sapply(immunescore_percentage_sig$cancer,function(i){median(is_expression[is_expression$dataset==i,2])})
 cor.test(is_median, immunescore_percentage_sig$percent, method = "spearman") #p-value = 0.6934; rho = -0.1111118
 
-
-#Panel b
-#Find metabolites that are siginificant in only HCC or ICC but are measured in both datasets
+# Panel b
+# Find metabolites that are siginificant in only HCC or ICC but are measured in both datasets
 IS_top2_table <- na.omit(immunescore_qvalues[immunescore_qvalues$immune_signature=="ImmuneScore",c(10,12,16)]) 
-#metabolites in HCC that are most significant that aren't also significant in ICC
+# metabolites in HCC that are most significant that aren't also significant in ICC
 HCC_metabolites <- c("1-linoleoyl-GPC (18:2)","1-palmitoleoyl-GPC (16:1)") 
-#metabolites in ICC that are most significant that aren't also significant in HCC
+# metabolites in ICC that are most significant that aren't also significant in HCC
 ICC_metabolites <- c("thymine","nicotinamide adenine dinucleotide reduced (NADH)","UDP-glucuronate") 
 
-#Matrix of the top metabolites in HCC and ICC to make expression heatmaps
+# Matrix of the top metabolites in HCC and ICC to make expression heatmaps
 HCC_matrix <- met_data$HCC_Tumor[c(HCC_metabolites,ICC_metabolites),]
 HCC_matrix <- HCC_matrix[,order(tme_data$HCC_Tumor[,1])] #sort by increasing ImmuneScore expression
 HCC_matrix <- t(scale(t(HCC_matrix)))
@@ -534,7 +539,7 @@ ICC_matrix_melt <- melt(ICC_matrix)
 ICC_matrix_melt$Var2 <- factor(ICC_matrix_melt$Var2, levels = colnames(ICC_matrix))
 colnames(ICC_matrix_melt) <- c("metabolite","variable","value")
 
-#Immune Score expression of samples in HCC and ICC
+# Immune Score expression of samples in HCC and ICC
 HCC_IS <- data.frame(sample = rownames(tme_data$HCC_Tumor)[order(tme_data$HCC_Tumor[,1])],
                      IS = tme_data$HCC_Tumor[order(tme_data$HCC_Tumor[,1]),1],
                      sig = rep("ImmuneScore",54))
@@ -545,20 +550,19 @@ ICC_IS <- data.frame(sample = rownames(tme_data$ICC_Tumor)[order(tme_data$ICC_Tu
                      sig = rep("ImmuneScore",86))
 ICC_IS$sample <- factor(ICC_IS$sample, levels = ICC_IS$sample) #sort by increasing ImmuneScore expression
 
-#Panel c
-#Determine the metabolites significantly associated with Immune Score
+# Panel c
+# Determine the metabolites significantly associated with Immune Score
 immunescore_concordance <- subset(tumor_concordance, immune_signature == "ImmuneScore" & n_dataset > 7) #metabolites in 8+ datasets 
 immunescore_concordance$p.adj <- p.adjust(immunescore_concordance$p.value, method = "BH") #adjust p-values
-#Mmap the pathways the metabolites belong to
+# Mmap the pathways the metabolites belong to
 immunescore_concordance$pathway <- metabolite_mapping$H_SUB_PATHWAY[match(immunescore_concordance$metabolite, metabolite_mapping$BIOCHEMICAL)] 
 is_metabolite_rank <- immunescore_concordance[order(-immunescore_concordance$p.adj),1] #ranking metabolites by significance
 immunescore_concordance$metabolite <- factor(immunescore_concordance$metabolite, levels = is_metabolite_rank) 
 immunescore_concordance <- immunescore_concordance[order(immunescore_concordance$p.adj),] #order by p-value
 length(which(immunescore_concordance$p.adj < 0.05)) #23
 
-
-#Panel d
-#Quinolinate vs z-scored ImmuneScore expression
+# Panel d
+# Quinolinate vs z-scored ImmuneScore expression
 with_quinolinate <- which(sapply(1:23,function(i){which(rownames(met_data[[i]])=="quinolinate")})!=0) #which datasets measured quinolinate; 13
 with_quinolinate_tumors <- intersect(tumors,with_quinolinate) #only interested in tumor datasets
 
@@ -568,7 +572,7 @@ quinolinate_is_exp <- data.frame(Dataset = unlist(sapply(1:10,function(i){rep(na
 quinolinate_is_exp$CancerType <- word(quinolinate_is_exp$Dataset,1,sep = "\\_Tumor") #remove _Tumor from names to allow for matching
 quinolinate_is_exp$CancerType <- as.factor(quinolinate_is_exp$CancerType)
 
-#NMN vs z-scored ImmuneScore expression
+# NMN vs z-scored ImmuneScore expression
 with_nmn <- which(sapply(1:23,function(i){which(rownames(met_data[[i]])=="nicotinamide ribonucleotide (NMN)")})!=0) #which datasets measured quinolinate; 8
 with_nmn_tumors <- intersect(tumors,with_nmn)#only interested in tumor datasets
 
@@ -578,19 +582,18 @@ nmn_is_exp <- data.frame(Dataset = unlist(sapply(1:8,function(i){rep(names(met_d
 nmn_is_exp$CancerType <- word(nmn_is_exp$Dataset,1,sep = "\\_Tumor") #remove _Tumor from names to allow for matching
 nmn_is_exp$CancerType <- as.factor(nmn_is_exp$CancerType)
 
-
-#Panel e
-#Based on absolute concordance, which pathways are the most associated with Immune Score?
+# Panel e
+# Based on absolute concordance, which pathways are the most associated with Immune Score?
 immune_score_concordance_8 <- tumor_concordance[,c(1:4)]
 immune_score_concordance_8 <- subset(immune_score_concordance_8, immune_signature == "ImmuneScore" & n_dataset > 7) #only keep metabolites in 8+ datasets
-#Map each metabolite to a pathway
+# Map each metabolite to a pathway
 immune_score_concordance_8$pathway <- metabolite_mapping$H_SUB_PATHWAY[match(immune_score_concordance_8$metabolite,metabolite_mapping$BIOCHEMICAL)]
 
-#Generate list of pathways represented in the 276 metabolites
+# Generate list of pathways represented in the 276 metabolites
 intersecting_pathways <- unique(immune_score_concordance_8$pathway) #73 actual pathways because one is NA (the first one)
 immune_score_concordance_8$abs_c <- abs(immune_score_concordance_8$concordance) #absolute concordance
-#One-sided wilcox test to determine which pathways have significantly higher absolute concordance to Immune Score than other pathways
-#One-sided Wilcox test because we're only interested in pathways that have higher than expected concordance values
+# One-sided wilcox test to determine which pathways have significantly higher absolute concordance to Immune Score than other pathways
+# One-sided Wilcox test because we're only interested in pathways that have higher than expected concordance values
 is_pathway_analysis <- data.frame(pathway = intersecting_pathways[2:74],
                                   pvalue = sapply(2:74, function(i){wilcox.test(immune_score_concordance_8[immune_score_concordance_8$pathway == intersecting_pathways[i],6],
                                                                                 immune_score_concordance_8[immune_score_concordance_8$pathway != intersecting_pathways[i],6], 
@@ -600,62 +603,60 @@ is_pathway_analysis <- is_pathway_analysis[is_pathway_analysis$pathway %in% is_p
 is_pathway_order <- is_pathway_analysis[order(-is_pathway_analysis$p.adj),1] #order so pathway levels are sorted from least to most significant
 is_pathway_analysis$pathway <- factor(is_pathway_analysis$pathway, levels = is_pathway_order) 
 
-
-#Panel f
-#Find samples which are tumor and CD45 negative/CD4/8 positive
+# Panel f
+# Find samples which are tumor and CD45 negative/CD4/8 positive
 kilgour_T_45 <- colnames(kilgour_data)[grep("T_45", colnames(kilgour_data))]
 kilgour_T_imm <- setdiff(colnames(kilgour_data)[grep("T.", colnames(kilgour_data))],kilgour_T_45)
 
-#Only interested in NAD+
+# Only interested in NAD+
 kiglour_metabolite_names <- metabolite_mapping$BIOCHEMICAL[match(rownames(kilgour_data),metabolite_mapping$H_HMDB)] #match HMDB IDs to metabolite names 
 which(kiglour_metabolite_names == "nicotinamide adenine dinucleotide (NAD+)") #73
 
-#Wilcox test to compare NAD+ expression in CD45- cells vs CD4/CD8+ cells in tumor samples
+# Wilcox test to compare NAD+ expression in CD45- cells vs CD4/CD8+ cells in tumor samples
 wilcox.test(kilgour_data[73,kilgour_T_45],kilgour_data[73,kilgour_T_imm]) #p-value = 0.0001696
 mean(kilgour_data[73,kilgour_T_45]) #mean of non-immune cells = 19.26
 mean(kilgour_data[73,kilgour_T_imm]) #mean of immune cells = 18.0435
 
-#Prepare expression matrix for plotting of the Kilgour data
+# Prepare expression matrix for plotting of the Kilgour data
 kilgour_nad <- data.frame(cell_type = c(rep("CD45",length(kilgour_T_45)),rep("CD4/8",length(kilgour_T_imm))),
                           expression = c(kilgour_data[73,kilgour_T_45],kilgour_data[73,kilgour_T_imm]))
 kilgour_nad$cell_type <- factor(kilgour_nad$cell_type, levels = c("CD45","CD4/8"))
 
-#Prepare expression matrix for plotting of the cAMP ovarian data
+# Prepare expression matrix for plotting of the cAMP ovarian data
 which(rownames(met_data$OV_Tumor)=="nicotinamide adenine dinucleotide (NAD+)") #256 
 
 ov_nad <- data.frame(NAD = as.numeric(met_data$OV_Tumor[256,]),
                      ImmuneScore = tme_data$OV_Tumor[,1])
 
+#### Prepare plotting data for Immune Cell Populations Figure ----
 
-
-#### Run analysis for Immune Cell Populations analysis ----
-#Tumor concordance matrix with only immune cell signatures
+# Tumor concordance matrix with only immune cell signatures
 bindea_concordance <- tumor_concordance[tumor_concordance$immune_signature %in% bindea_sigs,]
 bindea_concordance <- bindea_concordance[bindea_concordance$n_dataset > 7,] #only keep metabolites measured in 8+ datasets
 bindea_concordance$p.adj <- p.adjust(bindea_concordance$p.value, method = "BH") #re-correcting p-values based on this set of signatures
 bindea_concordance$pair <- paste(bindea_concordance$metabolite,bindea_concordance$immune_signature,sep="-")
 bindea_concordance$color <- ifelse(bindea_concordance$p.adj < 0.05, "Other","Not Significant")
 
-#Panel a
-#List of pairs to be labelled in the volcano plot
+# Panel a
+# List of pairs to be labelled in the volcano plot
 label_pairs_bindea <- c("kynurenine-aDC","quinolinate-T cells","histamine-Mast cells")
 
-#Prepare matrix to be used for rug plot
-#Plot only pairs which are associated with quinolinate
+# Prepare matrix to be used for rug plot
+# Plot only pairs which are associated with quinolinate
 bindea_concordance$col2<- NA
 bindea_concordance$col2[which(bindea_concordance$metabolite =="quinolinate")] <- 1
 bindea_concordance$col3 <- c("#B3CDE3")[bindea_concordance$col2]
 
-#Panel b
+# Panel b
 bindea_concordance_dots <- bindea_concordance
-#Find max concordance for each signature
+# Find max concordance for each signature
 max_concordance <- sapply(bindea_sigs,function(i){max(bindea_concordance_dots[bindea_concordance_dots$immune_signature==i,4])}) 
 max_concordance <- sort(max_concordance,decreasing = TRUE)
-#Re-order signature factor levels so so will it plot signatures from highest max to lowest
+# Re-order signature factor levels so so will it plot signatures from highest max to lowest
 bindea_concordance_dots$immune_signature <- factor(bindea_concordance_dots$immune_signature,levels = names(max_concordance)) 
 
-#Panel c
-#Histmaine vs z-scored Mast Cell expression
+# Panel c
+# Histmaine vs z-scored Mast Cell expression
 with_histamine <- which(sapply(1:23,function(i){which(rownames(met_data[[i]])=="histamine")})!=0) #which datasets measured histamine; 13
 with_histamine_tumors <- intersect(tumors,with_histamine) #only interested in tumor datasets; 13
 
@@ -665,19 +666,17 @@ histamine_mc_exp <- data.frame(Dataset = unlist(sapply(1:13,function(i){rep(name
 histamine_mc_exp$CancerType <- word(histamine_mc_exp$Dataset,1,sep = "\\_Tumor") #remove _Tumor from names to allow for matching
 histamine_mc_exp$CancerType <- as.factor(histamine_mc_exp$CancerType)
 
-
-#Panel d
-#Concordance of metabolites with mast cells
+# Panel d
+# Concordance of metabolites with mast cells
 mastcell_concordance <- subset(tumor_concordance, immune_signature == "Mast cells" & n_dataset > 4) #metabolites in 4+ datasets
 mastcell_concordance$p.adj <- p.adjust(mastcell_concordance$p.value, method = "BH") #re-adjust to just mast cell concordances
-#Re-order metabolite factor levels from largest to smallest
+# Re-order metabolite factor levels from largest to smallest
 mastcell_concordance$metabolite <- factor(mastcell_concordance$metabolite, levels = mastcell_concordance[order(-mastcell_concordance$p.adj),1]) 
 mastcell_concordance <- mastcell_concordance[order(mastcell_concordance$p.adj),]
 length(which(mastcell_concordance$p.adj < 0.05)) #how many significant metabolites; 21
 
-
-#Panel e
-#Histmaine vs z-scored HDC expression
+# Panel e
+# Histmaine vs z-scored HDC expression
 all(names(met_data)[with_histamine_tumors] == names(rna_data)) #make sure datasets are in the same order
 histamine_hdc_exp <- data.frame(Dataset = unlist(sapply(1:13,function(i){rep(names(rna_data)[[i]], ncol(met_data[[with_histamine_tumors[i]]]))})),
                                 Histamine = unlist(sapply(1:13,function(i){scale(as.numeric(met_data[[with_histamine_tumors[i]]]["histamine",]))})),
@@ -685,13 +684,12 @@ histamine_hdc_exp <- data.frame(Dataset = unlist(sapply(1:13,function(i){rep(nam
 histamine_hdc_exp$CancerType <- word(histamine_hdc_exp$Dataset,1,sep = "\\_Tumor") #remove _Tumor from names to allow for matching
 histamine_hdc_exp$CancerType <- as.factor(histamine_hdc_exp$CancerType)
 
-#calculate the range of histamine expression
+# calculate the range of histamine expression
 histamine_range <- as.data.frame(sapply(1:13,function(i){range(as.numeric(met_data[[with_histamine_tumors[i]]]["histamine",]))})) #range of histamine in all datasets
 mean(as.numeric(2^(abs(histamine_range[1,]-histamine_range[2,])))) #737.023
 
-
-#Panel f
-#Kynurenine vs z-scored aDC (without IDO1) expression
+# Panel f
+# Kynurenine vs z-scored aDC (without IDO1) expression
 with_kynurenine <- which(sapply(1:15,function(i){which(rownames(met_data_tumors[[i]])=="kynurenine")})!=0) #12 datasets
 
 adc_kyn_exp <- data.frame(Dataset = unlist(sapply(1:12,function(i){rep(names(met_data_tumors)[with_kynurenine[i]], dim(met_data_tumors[[with_kynurenine[i]]])[2])})),
@@ -700,9 +698,8 @@ adc_kyn_exp <- data.frame(Dataset = unlist(sapply(1:12,function(i){rep(names(met
 adc_kyn_exp$CancerType <- word(adc_kyn_exp$Dataset,1,sep = "\\_Tumor") #remove MetabImmune_tumor.csv from names to allow for matching
 adc_kyn_exp$CancerType <- as.factor(adc_kyn_exp$CancerType)
 
-
-#Supplemental figure 2
-#boxplot of mast cell-histamine concordance for each dataset
+# Supplemental figure 2
+# boxplot of mast cell-histamine concordance for each dataset
 histamine_concordance <- tumor_concordance[tumor_concordance$immune_signature=="Mast cells" & tumor_concordance$metabolite=="histamine",8:22]
 histamine_concordance <- melt(histamine_concordance)
 histamine_concordance$pair <- c("Histamine-Mast Cells")

@@ -28,12 +28,12 @@ selectedDataSetList<-c("BRCA1",
                        "ccRCC4")
 
 setWithRNAseq<-c("BRCA2",
-                 "HurthleCC",#
-                 "GBM",#
-                 "DLBCL",#
+                 "HurthleCC",
+                 "GBM",
+                 "DLBCL",
                  "ccRCC1",
                  "ccRCC2",
-                 "ccRCC3",#
+                 "ccRCC3",
                  "ccRCC4")
 
 for(idx in 1:length(selectedDataSetList)){
