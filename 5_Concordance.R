@@ -86,7 +86,7 @@ remove(rna_all, met_all, rna_scaled, met_scaled)
 warning("The concordance calculation is computationally intense and will take >12 hours on a typical laptop.")
 
 # compute pairwise concordance
-conc <- mclapply(gg[1:10], function(g){
+conc <- mclapply(gg, function(g){
   mclapply(rownames(met_joint), function(m){
     
     # gene values
